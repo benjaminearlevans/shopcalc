@@ -1,11 +1,10 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "inches",
-  "title": "inches",
-  "description": "",
+  "name": "shopcalc",
+  "title": "ShopCalc",
+  "description": "Woodworking calculators for spacing, conversions, cut lists, and joint angles",
   "icon": "extension-icon.png",
   "author": "bnjmn",
-  "owner": "benjamxn",
   "platforms": [
     "macOS",
     "Windows"
@@ -14,14 +13,233 @@
     "Productivity"
   ],
   "license": "MIT",
-  "commands": [
+  "preferences": [
     {
-      "name": "inches",
-      "title": "inches",
-      "description": "Does calculations in fractional inches",
-      "mode": "no-view"
+      "name": "defaultUnit",
+      "title": "Default Unit",
+      "description": "Preferred measurement unit",
+      "type": "dropdown",
+      "required": false,
+      "default": "inches",
+      "data": [
+        {
+          "title": "Inches (fractional)",
+          "value": "inches"
+        },
+        {
+          "title": "Millimeters",
+          "value": "mm"
+        },
+        {
+          "title": "Centimeters",
+          "value": "cm"
+        }
+      ]
+    },
+    {
+      "name": "fractionPrecision",
+      "title": "Fraction Precision",
+      "description": "Smallest fraction to display",
+      "type": "dropdown",
+      "required": false,
+      "default": "16",
+      "data": [
+        {
+          "title": "1/8\"",
+          "value": "8"
+        },
+        {
+          "title": "1/16\"",
+          "value": "16"
+        },
+        {
+          "title": "1/32\"",
+          "value": "32"
+        },
+        {
+          "title": "1/64\"",
+          "value": "64"
+        }
+      ]
+    },
+    {
+      "name": "kerfWidth",
+      "title": "Default Kerf Width",
+      "description": "Blade kerf in inches (for example 0.125 for 1/8\")",
+      "type": "textfield",
+      "required": false,
+      "default": "0.125"
     }
   ],
+  "commands": [
+    {
+      "name": "quick-convert",
+      "title": "Quick Convert",
+      "subtitle": "ShopCalc",
+      "description": "Natural-language style unit conversion from one expression",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "query",
+          "placeholder": "12-7/8 in to mm",
+          "required": true,
+          "type": "text"
+        }
+      ],
+      "keywords": [
+        "quick",
+        "numi",
+        "expression",
+        "fraction",
+        "convert"
+      ]
+    },
+    {
+      "name": "guided-start",
+      "title": "Guided Start",
+      "subtitle": "ShopCalc",
+      "description": "Start with plain-language tasks and jump to the right calculator",
+      "mode": "view",
+      "keywords": [
+        "start",
+        "guide",
+        "beginner",
+        "help"
+      ]
+    },
+    {
+      "name": "spacing",
+      "title": "Spacing Calculator",
+      "subtitle": "ShopCalc",
+      "description": "Calculate equal spacing for slats, dados, dowels, or repeating elements",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "prefill",
+          "placeholder": "(internal prefill)",
+          "required": false,
+          "type": "text"
+        }
+      ],
+      "keywords": [
+        "slat",
+        "dado",
+        "spacing",
+        "pitch",
+        "gap",
+        "divider"
+      ]
+    },
+    {
+      "name": "convert",
+      "title": "Unit Converter",
+      "subtitle": "ShopCalc",
+      "description": "Convert between mm/cm and inches with fractional display",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "prefill",
+          "placeholder": "(internal prefill)",
+          "required": false,
+          "type": "text"
+        }
+      ],
+      "keywords": [
+        "mm",
+        "cm",
+        "inches",
+        "fraction",
+        "convert",
+        "metric",
+        "imperial"
+      ]
+    },
+    {
+      "name": "cutlist",
+      "title": "Cut List Calculator",
+      "subtitle": "ShopCalc",
+      "description": "Calculate board count, sheet yield, and waste for a project",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "prefill",
+          "placeholder": "(internal prefill)",
+          "required": false,
+          "type": "text"
+        }
+      ],
+      "keywords": [
+        "cut",
+        "board",
+        "sheet",
+        "plywood",
+        "lumber",
+        "waste",
+        "yield"
+      ]
+    },
+    {
+      "name": "angle",
+      "title": "Joint Angle Calculator",
+      "subtitle": "ShopCalc",
+      "description": "Calculate miter, bevel, and compound angles for joints",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "prefill",
+          "placeholder": "(internal prefill)",
+          "required": false,
+          "type": "text"
+        }
+      ],
+      "keywords": [
+        "miter",
+        "bevel",
+        "angle",
+        "compound",
+        "joint",
+        "railing",
+        "stair"
+      ]
+    },
+    {
+      "name": "history",
+      "title": "Calculation History",
+      "subtitle": "ShopCalc",
+      "description": "View and re-run recent calculations",
+      "mode": "view",
+      "keywords": [
+        "history",
+        "recent",
+        "last"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "calculate-spacing",
+      "title": "Calculate Spacing",
+      "description": "Calculate equal spacing for slats, dados, dowels, or repeating elements and return exact positions and a visual diagram."
+    },
+    {
+      "name": "convert-units",
+      "title": "Convert Units",
+      "description": "Convert between millimeters, centimeters, and inches with decimal and fractional output."
+    },
+    {
+      "name": "calculate-cutlist",
+      "title": "Calculate Cut List",
+      "description": "Estimate board or sheet usage with kerf compensation, waste, and layout output."
+    },
+    {
+      "name": "calculate-angle",
+      "title": "Calculate Joint Angle",
+      "description": "Calculate miter, bevel, polygon, and stair-rail joint angles."
+    }
+  ],
+  "ai": {
+    "instructions": "ShopCalc is a woodworking calculator. Use tools for spacing, conversion, cut lists, and angle tasks. Include decimal millimeter and centimeter values and fractional inch values where relevant. For spacing output, include a readable position diagram. Default to inches unless the user explicitly requests metric."
+  },
   "dependencies": {
     "@raycast/api": "^1.104.7",
     "@raycast/utils": "^1.17.0"
@@ -32,13 +250,15 @@
     "@types/react": "19.0.10",
     "eslint": "^9.22.0",
     "prettier": "^3.5.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^2.1.9"
   },
   "scripts": {
     "build": "ray build",
     "dev": "ray develop",
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
+    "test": "vitest run",
     "prepublishOnly": "echo \"\\n\\nIt seems like you are trying to publish the Raycast extension to npm.\\n\\nIf you did intend to publish it to npm, remove the \\`prepublishOnly\\` script and rerun \\`npm publish\\` again.\\nIf you wanted to publish it to the Raycast Store instead, use \\`npm run publish\\` instead.\\n\\n\" && exit 1",
     "publish": "npx @raycast/api@latest publish"
   }
