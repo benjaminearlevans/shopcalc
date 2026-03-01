@@ -13,6 +13,7 @@ import {
 } from "@raycast/api";
 import { useMemo, useState } from "react";
 import { calculateHingeLayout } from "../lib/hinge-layout";
+import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
 import { ExtensionPreferences, HingeLayoutInput, HingeLayoutResult, HingeMode, ToolContext, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
@@ -27,6 +28,7 @@ interface HingeFormValues {
   unit: Unit;
   includeStlParams: "true" | "false";
   toolContext: ToolContext;
+  detailMode: "basic" | "advanced";
 }
 
 type HingeArgs = {
@@ -47,6 +49,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "mm");
   const [includeStlParams, setIncludeStlParams] = useState<"true" | "false">(prefill.includeStlParams ?? "false");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
+  const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
 
   const preview = useMemo(() => {
     try {
@@ -60,6 +63,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
         unit,
         includeStlParams,
         toolContext,
+        detailMode,
       });
       if (!input) {
         return "Live preview: enter door height and hinge offsets.";
@@ -79,6 +83,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
     unit,
     includeStlParams,
     toolContext,
+    detailMode,
   ]);
 
   async function handleSubmit(values: HingeFormValues) {
@@ -109,6 +114,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
     setUnit("mm");
     setIncludeStlParams("true");
     setToolContext("drill");
+    setDetailMode("advanced");
   }
 
   return (
@@ -125,12 +131,22 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
       }
     >
       <Form.Description text="Generate mirror-safe cup drilling coordinates and optional jig parameter export." />
+      <Form.Dropdown
+        id="detailMode"
+        title="Mode"
+        value={detailMode}
+        onChange={(value) => setDetailMode(value as "basic" | "advanced")}
+      >
+        <Form.Dropdown.Item value="basic" title="Basic" />
+        <Form.Dropdown.Item value="advanced" title="Advanced" />
+      </Form.Dropdown>
       <Form.TextField
         id="doorHeight"
         title="Door Height"
         value={doorHeight}
         onChange={setDoorHeight}
         placeholder="716"
+        info='Full door height. Accepts suffix/fraction (716mm, 71.6cm, 28-3/16").'
         autoFocus
       />
       <Form.TextField
@@ -139,6 +155,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
         value={topHingeOffset}
         onChange={setTopHingeOffset}
         placeholder="100"
+        info="Distance from top edge to top cup center. Accepts suffix/fraction."
       />
       <Form.TextField
         id="bottomHingeOffset"
@@ -146,6 +163,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
         value={bottomHingeOffset}
         onChange={setBottomHingeOffset}
         placeholder="100"
+        info="Distance from bottom edge to bottom cup center. Accepts suffix/fraction."
       />
       <Form.TextField
         id="cupDiameter"
@@ -153,6 +171,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
         value={cupDiameter}
         onChange={setCupDiameter}
         placeholder="35"
+        info="Hinge cup bore size (often 35mm for Euro hinges)."
       />
       <Form.TextField
         id="edgeSetback"
@@ -160,6 +179,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
         value={edgeSetback}
         onChange={setEdgeSetback}
         placeholder="5"
+        info="Distance from door edge to cup-bore edge."
       />
       <Form.Dropdown id="mode" title="Door Mode" value={mode} onChange={(value) => setMode(value as HingeMode)}>
         <Form.Dropdown.Item value="overlay" title="Overlay" />
@@ -170,27 +190,33 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
         <Form.Dropdown.Item value="cm" title="Centimeters" />
         <Form.Dropdown.Item value="inches" title="Inches" />
       </Form.Dropdown>
-      <Form.Dropdown
-        id="includeStlParams"
-        title="Include STL Param Export"
-        value={includeStlParams}
-        onChange={(value) => setIncludeStlParams(value as "true" | "false")}
-      >
-        <Form.Dropdown.Item value="false" title="No" />
-        <Form.Dropdown.Item value="true" title="Yes" />
-      </Form.Dropdown>
-      <Form.Dropdown
-        id="toolContext"
-        title="Safety Tool Context"
-        value={toolContext}
-        onChange={(value) => setToolContext(value as ToolContext)}
-      >
-        <Form.Dropdown.Item value="none" title="None" />
-        <Form.Dropdown.Item value="router" title="Router" />
-        <Form.Dropdown.Item value="table-saw" title="Table Saw" />
-        <Form.Dropdown.Item value="drill" title="Drill" />
-        <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
-      </Form.Dropdown>
+      {detailMode === "advanced" ? (
+        <>
+          <Form.Dropdown
+            id="includeStlParams"
+            title="Include STL Param Export"
+            value={includeStlParams}
+            onChange={(value) => setIncludeStlParams(value as "true" | "false")}
+            info="Emit parameter JSON suitable for future jig model generation."
+          >
+            <Form.Dropdown.Item value="false" title="No" />
+            <Form.Dropdown.Item value="true" title="Yes" />
+          </Form.Dropdown>
+          <Form.Dropdown
+            id="toolContext"
+            title="Safety Tool Context"
+            value={toolContext}
+            onChange={(value) => setToolContext(value as ToolContext)}
+            info="Shows force-vector safety checklist in the output."
+          >
+            <Form.Dropdown.Item value="none" title="None" />
+            <Form.Dropdown.Item value="router" title="Router" />
+            <Form.Dropdown.Item value="table-saw" title="Table Saw" />
+            <Form.Dropdown.Item value="drill" title="Drill" />
+            <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
+          </Form.Dropdown>
+        </>
+      ) : null}
       <Form.Separator />
       <Form.Description text={preview} />
     </Form>
@@ -198,7 +224,28 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
 }
 
 function HingeResultView({ result }: { result: HingeLayoutResult }) {
+  const warningStatus = result.warnings.length ? `Caution (${result.warnings.length})` : "Clear";
+  const coordinateTable = [
+    "| Hinge | X | Y |",
+    "| --- | --- | --- |",
+    `| Top | ${result.cupCenterX.toFixed(3)} ${result.input.unit} | ${result.topHoleY.toFixed(3)} ${result.input.unit} |`,
+    `| Bottom | ${result.cupCenterX.toFixed(3)} ${result.input.unit} | ${result.bottomHoleY.toFixed(3)} ${result.input.unit} |`,
+  ].join("\n");
+  const axisDiagram = [
+    "```text",
+    "(0,0) top-left origin",
+    "x ->",
+    "|",
+    "v y",
+    `Top cup:    (${result.cupCenterX.toFixed(3)}, ${result.topHoleY.toFixed(3)})`,
+    `Bottom cup: (${result.cupCenterX.toFixed(3)}, ${result.bottomHoleY.toFixed(3)})`,
+    "```",
+  ].join("\n");
   const parts = [result.summary, "", formatSafetyChecklist(result.input.toolContext)];
+  parts.unshift(axisDiagram);
+  parts.unshift("");
+  parts.unshift(coordinateTable);
+  parts.unshift("**Drill Coordinates**");
   if (result.stlParams) {
     parts.push("", "**STL Parameters (JSON)**", "```json", result.stlParams, "```");
   }
@@ -207,9 +254,30 @@ function HingeResultView({ result }: { result: HingeLayoutResult }) {
   return (
     <Detail
       markdown={markdown}
+      metadata={
+        <Detail.Metadata>
+          <Detail.Metadata.Label
+            title="Top Cup Center"
+            text={`X ${result.cupCenterX.toFixed(3)}, Y ${result.topHoleY.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label
+            title="Bottom Cup Center"
+            text={`X ${result.cupCenterX.toFixed(3)}, Y ${result.bottomHoleY.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label title="Mirror-Safe" text={result.mirrorSafe ? "Yes" : "No"} />
+          <Detail.Metadata.TagList title="Warnings">
+            <Detail.Metadata.TagList.Item text={warningStatus} color={result.warnings.length ? "#FF7A00" : "#0CA678"} />
+          </Detail.Metadata.TagList>
+        </Detail.Metadata>
+      }
       actions={
         <ActionPanel>
           <Action.CopyToClipboard title="Copy Summary" content={markdown.replace(/\*\*/g, "")} />
+          <Action.CopyToClipboard
+            title="Copy Drill Coordinates"
+            content={`Top: X ${result.cupCenterX.toFixed(3)}, Y ${result.topHoleY.toFixed(3)} ${result.input.unit}\nBottom: X ${result.cupCenterX.toFixed(3)}, Y ${result.bottomHoleY.toFixed(3)} ${result.input.unit}`}
+          />
+          <Action.CopyToClipboard title="Copy Template Reference" content={result.printableTemplateRef} />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
         </ActionPanel>
       }
@@ -229,11 +297,11 @@ function parseInput(values: Partial<HingeFormValues>): HingeLayoutInput | null {
   }
 
   return {
-    doorHeight: Number(values.doorHeight),
-    topHingeOffset: Number(values.topHingeOffset),
-    bottomHingeOffset: Number(values.bottomHingeOffset),
-    cupDiameter: Number(values.cupDiameter),
-    edgeSetback: Number(values.edgeSetback),
+    doorHeight: parseMeasurementInput(values.doorHeight, values.unit ?? "mm", "door height"),
+    topHingeOffset: parseMeasurementInput(values.topHingeOffset, values.unit ?? "mm", "top hinge offset"),
+    bottomHingeOffset: parseMeasurementInput(values.bottomHingeOffset, values.unit ?? "mm", "bottom hinge offset"),
+    cupDiameter: parseMeasurementInput(values.cupDiameter, values.unit ?? "mm", "cup diameter"),
+    edgeSetback: parseMeasurementInput(values.edgeSetback, values.unit ?? "mm", "edge setback"),
     mode: (values.mode ?? "overlay") as HingeMode,
     unit: (values.unit ?? "mm") as Unit,
     includeStlParams: (values.includeStlParams ?? "false") === "true",

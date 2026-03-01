@@ -90,232 +90,240 @@ const EXAMPLES = {
 export default function GuidedStartCommand() {
   return (
     <List searchBarPlaceholder="What are you trying to do?">
-      <List.Item
-        icon={{ source: Icon.Ruler, tintColor: Color.Blue }}
-        title="I need evenly spaced pieces"
-        subtitle="Slats, dividers, dados"
-        accessories={[{ text: "Spacing" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Spacing Calculator"
-              onAction={() => launchCommand({ name: "spacing", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Spacing Example"
-              onAction={() =>
-                launchCommand({
-                  name: "spacing",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.spacing },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.ArrowsExpand, tintColor: Color.Purple }}
-        title="I need to convert measurements"
-        subtitle="mm/cm <-> inches with fractions"
-        accessories={[{ text: "Convert" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Unit Converter"
-              onAction={() => launchCommand({ name: "convert", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Fraction Example"
-              onAction={() =>
-                launchCommand({
-                  name: "convert",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.convert },
-                })
-              }
-            />
-            <Action
-              title="Open Quick Convert (Natural Language)"
-              onAction={() =>
-                launchCommand({
-                  name: "quick-convert",
-                  type: LaunchType.UserInitiated,
-                  arguments: { query: "12-7/8 in to mm" },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.List, tintColor: Color.Orange }}
-        title="I need to know how much material to buy"
-        subtitle="Boards/sheets, waste, layout"
-        accessories={[{ text: "Cut List" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Cut List Calculator"
-              onAction={() => launchCommand({ name: "cutlist", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Cut List Example"
-              onAction={() =>
-                launchCommand({
-                  name: "cutlist",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.cutlist },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.Compass, tintColor: Color.Green }}
-        title="I need saw angle settings"
-        subtitle="Corners, stairs, polygon frames"
-        accessories={[{ text: "Angles" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Angle Calculator"
-              onAction={() => launchCommand({ name: "angle", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open 90° Corner Example"
-              onAction={() =>
-                launchCommand({
-                  name: "angle",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.angle },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.Hammer, tintColor: Color.Red }}
-        title="I need drawer box cut dimensions"
-        subtitle="Slide clearance + joinery-aware sizing"
-        accessories={[{ text: "Drawer Engine" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Drawer Engine"
-              onAction={() => launchCommand({ name: "drawer-engine", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Drawer Example"
-              onAction={() =>
-                launchCommand({
-                  name: "drawer-engine",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.drawer },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.Pin, tintColor: Color.Purple }}
-        title="I need hinge cup drill coordinates"
-        subtitle="Mirror-safe top/bottom layout"
-        accessories={[{ text: "Hinge Layout" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Hinge Layout"
-              onAction={() => launchCommand({ name: "hinge-layout", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Hinge Example"
-              onAction={() =>
-                launchCommand({
-                  name: "hinge-layout",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.hinge },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.List, tintColor: Color.Orange }}
-        title="I need drawer slide baseline coordinates"
-        subtitle="Spacer block and vertical placements"
-        accessories={[{ text: "Slide Layout" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Slide Layout"
-              onAction={() => launchCommand({ name: "slide-layout", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Slide Example"
-              onAction={() =>
-                launchCommand({
-                  name: "slide-layout",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.slide },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.Ruler, tintColor: Color.Blue }}
-        title="I need wall scribe oversize planning"
-        subtitle="Rough cut and shim-risk guidance"
-        accessories={[{ text: "Scribe Planner" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Scribe Planner"
-              onAction={() => launchCommand({ name: "scribe-planner", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Scribe Example"
-              onAction={() =>
-                launchCommand({
-                  name: "scribe-planner",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.scribe },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        icon={{ source: Icon.Bolt, tintColor: Color.Green }}
-        title="I need drill stop depth settings"
-        subtitle="Stop collar + through-hole warnings"
-        accessories={[{ text: "Drill Depth" }]}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Open Drill Depth"
-              onAction={() => launchCommand({ name: "drill-depth", type: LaunchType.UserInitiated })}
-            />
-            <Action
-              title="Open Drill Example"
-              onAction={() =>
-                launchCommand({
-                  name: "drill-depth",
-                  type: LaunchType.UserInitiated,
-                  arguments: { prefill: EXAMPLES.drill },
-                })
-              }
-            />
-          </ActionPanel>
-        }
-      />
+      <List.Section title="Layout">
+        <List.Item
+          icon={{ source: Icon.Ruler, tintColor: Color.Blue }}
+          title="I need evenly spaced pieces"
+          subtitle="Slats, dividers, dados"
+          accessories={[{ text: "Spacing" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Spacing Calculator"
+                onAction={() => launchCommand({ name: "spacing", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Spacing Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "spacing",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.spacing },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          icon={{ source: Icon.List, tintColor: Color.Orange }}
+          title="I need drawer slide baseline coordinates"
+          subtitle="Spacer block and vertical placements"
+          accessories={[{ text: "Slide Layout" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Slide Layout"
+                onAction={() => launchCommand({ name: "slide-layout", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Slide Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "slide-layout",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.slide },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          icon={{ source: Icon.Ruler, tintColor: Color.Blue }}
+          title="I need wall scribe oversize planning"
+          subtitle="Rough cut and shim-risk guidance"
+          accessories={[{ text: "Scribe Planner" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Scribe Planner"
+                onAction={() => launchCommand({ name: "scribe-planner", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Scribe Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "scribe-planner",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.scribe },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
+      <List.Section title="Joinery">
+        <List.Item
+          icon={{ source: Icon.List, tintColor: Color.Orange }}
+          title="I need to know how much material to buy"
+          subtitle="Boards/sheets, waste, layout"
+          accessories={[{ text: "Cut List" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Cut List Calculator"
+                onAction={() => launchCommand({ name: "cutlist", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Cut List Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "cutlist",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.cutlist },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          icon={{ source: Icon.Compass, tintColor: Color.Green }}
+          title="I need saw angle settings"
+          subtitle="Corners, stairs, polygon frames"
+          accessories={[{ text: "Angles" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Angle Calculator"
+                onAction={() => launchCommand({ name: "angle", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open 90° Corner Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "angle",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.angle },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          icon={{ source: Icon.Hammer, tintColor: Color.Red }}
+          title="I need drawer box cut dimensions"
+          subtitle="Slide clearance + joinery-aware sizing"
+          accessories={[{ text: "Drawer Engine" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Drawer Engine"
+                onAction={() => launchCommand({ name: "drawer-engine", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Drawer Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "drawer-engine",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.drawer },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          icon={{ source: Icon.Pin, tintColor: Color.Purple }}
+          title="I need hinge cup drill coordinates"
+          subtitle="Mirror-safe top/bottom layout"
+          accessories={[{ text: "Hinge Layout" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Hinge Layout"
+                onAction={() => launchCommand({ name: "hinge-layout", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Hinge Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "hinge-layout",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.hinge },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
+      <List.Section title="Utility">
+        <List.Item
+          icon={{ source: Icon.ArrowsExpand, tintColor: Color.Purple }}
+          title="I need to convert measurements"
+          subtitle="mm/cm <-> inches with fractions"
+          accessories={[{ text: "Convert" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Unit Converter"
+                onAction={() => launchCommand({ name: "convert", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Fraction Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "convert",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.convert },
+                  })
+                }
+              />
+              <Action
+                title="Open Quick Convert (Natural Language)"
+                onAction={() =>
+                  launchCommand({
+                    name: "quick-convert",
+                    type: LaunchType.UserInitiated,
+                    arguments: { query: "12-7/8 in to mm" },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
+      <List.Section title="Safety">
+        <List.Item
+          icon={{ source: Icon.Bolt, tintColor: Color.Green }}
+          title="I need drill stop depth settings"
+          subtitle="Stop collar + through-hole warnings"
+          accessories={[{ text: "Drill Depth" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Drill Depth"
+                onAction={() => launchCommand({ name: "drill-depth", type: LaunchType.UserInitiated })}
+              />
+              <Action
+                title="Open Drill Example"
+                onAction={() =>
+                  launchCommand({
+                    name: "drill-depth",
+                    type: LaunchType.UserInitiated,
+                    arguments: { prefill: EXAMPLES.drill },
+                  })
+                }
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
     </List>
   );
 }

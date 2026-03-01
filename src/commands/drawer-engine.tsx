@@ -13,6 +13,7 @@ import {
 } from "@raycast/api";
 import { useMemo, useState } from "react";
 import { calculateDrawerBox } from "../lib/drawer-box";
+import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
 import {
   DrawerBoxInput,
@@ -36,6 +37,7 @@ interface DrawerFormValues {
   bottomThickness: string;
   unit: Unit;
   toolContext: ToolContext;
+  detailMode: "basic" | "advanced";
 }
 
 type DrawerArgs = {
@@ -57,6 +59,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
   const [bottomThickness, setBottomThickness] = useState(prefill.bottomThickness ?? "0.25");
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
+  const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
 
   const preview = useMemo(() => {
     try {
@@ -71,6 +74,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
         bottomThickness,
         unit,
         toolContext,
+        detailMode,
       });
       if (!input) {
         return "Live preview: fill opening width, drawer depth, and material values.";
@@ -91,6 +95,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
     bottomThickness,
     unit,
     toolContext,
+    detailMode,
   ]);
 
   async function handleSubmit(values: DrawerFormValues) {
@@ -122,6 +127,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
     setBottomThickness("0.25");
     setUnit("inches");
     setToolContext("table-saw");
+    setDetailMode("advanced");
   }
 
   return (
@@ -138,12 +144,22 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
       }
     >
       <Form.Description text="Compute drawer parts and joinery dimensions from opening + slide constraints." />
+      <Form.Dropdown
+        id="detailMode"
+        title="Mode"
+        value={detailMode}
+        onChange={(value) => setDetailMode(value as "basic" | "advanced")}
+      >
+        <Form.Dropdown.Item value="basic" title="Basic" />
+        <Form.Dropdown.Item value="advanced" title="Advanced" />
+      </Form.Dropdown>
       <Form.TextField
         id="openingWidth"
         title="Opening Width"
         value={openingWidth}
         onChange={setOpeningWidth}
         placeholder="21"
+        info='Inside cabinet width available for the drawer. Accepts suffix/fraction (21, 533.4mm, 21").'
         autoFocus
       />
       <Form.TextField
@@ -152,12 +168,14 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
         value={drawerDepth}
         onChange={setDrawerDepth}
         placeholder="18"
+        info='Front-to-back drawer length target. Accepts suffix/fraction (18, 457.2mm, 18").'
       />
       <Form.Dropdown
         id="slideType"
         title="Slide Type"
         value={slideType}
         onChange={(value) => setSlideType(value as DrawerSlideType)}
+        info="Side-mount usually needs larger side clearance than undermount."
       >
         <Form.Dropdown.Item value="side-mount" title="Side Mount" />
         <Form.Dropdown.Item value="undermount" title="Undermount" />
@@ -168,6 +186,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
         value={slideClearance}
         onChange={setSlideClearance}
         placeholder="0.5"
+        info="Required gap on EACH side for slide hardware. Accepts suffix/fraction (0.5, 12.7mm)."
       />
       <Form.TextField
         id="materialThickness"
@@ -175,48 +194,59 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
         value={materialThickness}
         onChange={setMaterialThickness}
         placeholder="0.75"
+        info='Panel stock thickness. Accepts suffix/fraction (0.75, 19mm, 3/4").'
       />
-      <Form.Dropdown
-        id="joineryType"
-        title="Joinery Type"
-        value={joineryType}
-        onChange={(value) => setJoineryType(value as JoineryType)}
-      >
-        <Form.Dropdown.Item value="butt" title="Butt" />
-        <Form.Dropdown.Item value="rabbet" title="Rabbet" />
-        <Form.Dropdown.Item value="dado" title="Dado" />
-      </Form.Dropdown>
-      <Form.TextField
-        id="bottomInsetDepth"
-        title="Bottom Inset Depth"
-        value={bottomInsetDepth}
-        onChange={setBottomInsetDepth}
-        placeholder="0.25"
-      />
-      <Form.TextField
-        id="bottomThickness"
-        title="Bottom Thickness"
-        value={bottomThickness}
-        onChange={setBottomThickness}
-        placeholder="0.25"
-      />
+      {detailMode === "advanced" ? (
+        <>
+          <Form.Dropdown
+            id="joineryType"
+            title="Joinery Type"
+            value={joineryType}
+            onChange={(value) => setJoineryType(value as JoineryType)}
+            info="Choose how front/back joins to sides."
+          >
+            <Form.Dropdown.Item value="butt" title="Butt" />
+            <Form.Dropdown.Item value="rabbet" title="Rabbet" />
+            <Form.Dropdown.Item value="dado" title="Dado" />
+          </Form.Dropdown>
+          <Form.TextField
+            id="bottomInsetDepth"
+            title="Bottom Inset Depth"
+            value={bottomInsetDepth}
+            onChange={setBottomInsetDepth}
+            placeholder="0.25"
+            info="Distance from panel edge to bottom groove/rabbet. Accepts suffix/fraction."
+          />
+          <Form.TextField
+            id="bottomThickness"
+            title="Bottom Thickness"
+            value={bottomThickness}
+            onChange={setBottomThickness}
+            placeholder="0.25"
+            info="Drawer bottom panel thickness. Accepts suffix/fraction."
+          />
+        </>
+      ) : null}
       <Form.Dropdown id="unit" title="Unit" value={unit} onChange={(value) => setUnit(value as Unit)}>
         <Form.Dropdown.Item value="inches" title="Inches" />
         <Form.Dropdown.Item value="mm" title="Millimeters" />
         <Form.Dropdown.Item value="cm" title="Centimeters" />
       </Form.Dropdown>
-      <Form.Dropdown
-        id="toolContext"
-        title="Safety Tool Context"
-        value={toolContext}
-        onChange={(value) => setToolContext(value as ToolContext)}
-      >
-        <Form.Dropdown.Item value="none" title="None" />
-        <Form.Dropdown.Item value="router" title="Router" />
-        <Form.Dropdown.Item value="table-saw" title="Table Saw" />
-        <Form.Dropdown.Item value="drill" title="Drill" />
-        <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
-      </Form.Dropdown>
+      {detailMode === "advanced" ? (
+        <Form.Dropdown
+          id="toolContext"
+          title="Safety Tool Context"
+          value={toolContext}
+          onChange={(value) => setToolContext(value as ToolContext)}
+          info="Shows force-vector safety checklist in the output."
+        >
+          <Form.Dropdown.Item value="none" title="None" />
+          <Form.Dropdown.Item value="router" title="Router" />
+          <Form.Dropdown.Item value="table-saw" title="Table Saw" />
+          <Form.Dropdown.Item value="drill" title="Drill" />
+          <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
+        </Form.Dropdown>
+      ) : null}
       <Form.Separator />
       <Form.Description text={preview} />
     </Form>
@@ -225,14 +255,57 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
 
 function DrawerResultView({ result }: { result: DrawerBoxResult }) {
   const safetyMarkdown = formatSafetyChecklist(result.input.toolContext);
-  const markdown = [result.summary, "", result.diagram, "", safetyMarkdown].join("\n\n");
+  const warningStatus = result.warnings.length ? `Caution (${result.warnings.length})` : "Clear";
+  const cutTable = [
+    "| Part | Dimension |",
+    "| --- | --- |",
+    `| Side Panels | ${result.sidePanelLength.toFixed(3)} ${result.input.unit} |`,
+    `| Front/Back Panels | ${result.frontBackPanelLength.toFixed(3)} ${result.input.unit} |`,
+    `| Bottom Panel | ${result.bottomPanelWidth.toFixed(3)} x ${result.bottomPanelLength.toFixed(3)} ${result.input.unit} |`,
+  ].join("\n");
+  const markdown = [result.summary, "", "**Cut Table**", cutTable, "", result.diagram, "", safetyMarkdown].join("\n\n");
+  const joineryText = `${result.rabbetDepth.toFixed(3)} ${result.input.unit} deep x ${result.rabbetWidth.toFixed(3)} ${result.input.unit} wide`;
+  const cutListText = [
+    `Side: ${result.sidePanelLength.toFixed(3)} ${result.input.unit}`,
+    `Front/Back: ${result.frontBackPanelLength.toFixed(3)} ${result.input.unit}`,
+    `Bottom: ${result.bottomPanelWidth.toFixed(3)} x ${result.bottomPanelLength.toFixed(3)} ${result.input.unit}`,
+  ].join("\n");
 
   return (
     <Detail
       markdown={markdown}
+      metadata={
+        <Detail.Metadata>
+          <Detail.Metadata.Label
+            title="Side Panel Length"
+            text={`${result.sidePanelLength.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label
+            title="Front/Back Length"
+            text={`${result.frontBackPanelLength.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label
+            title="Bottom Panel"
+            text={`${result.bottomPanelWidth.toFixed(3)} x ${result.bottomPanelLength.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label
+            title="Slide Spacing"
+            text={`${result.requiredSlideSpacing.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.TagList title="Warnings">
+            <Detail.Metadata.TagList.Item text={warningStatus} color={result.warnings.length ? "#FF7A00" : "#0CA678"} />
+          </Detail.Metadata.TagList>
+        </Detail.Metadata>
+      }
       actions={
         <ActionPanel>
           <Action.CopyToClipboard title="Copy Summary" content={markdown.replace(/\*\*/g, "")} />
+          <Action.CopyToClipboard title="Copy Cut Dimensions" content={cutListText} />
+          <Action.CopyToClipboard
+            title="Copy Bottom Panel Only"
+            content={`${result.bottomPanelWidth.toFixed(3)} x ${result.bottomPanelLength.toFixed(3)} ${result.input.unit}`}
+          />
+          <Action.CopyToClipboard title="Copy Joinery Settings" content={joineryText} />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
         </ActionPanel>
       }
@@ -245,23 +318,23 @@ function parseInput(values: Partial<DrawerFormValues>): DrawerBoxInput | null {
     !values.openingWidth?.trim() ||
     !values.drawerDepth?.trim() ||
     !values.slideClearance?.trim() ||
-    !values.materialThickness?.trim() ||
-    !values.bottomInsetDepth?.trim() ||
-    !values.bottomThickness?.trim()
+    !values.materialThickness?.trim()
   ) {
     return null;
   }
 
+  const unit = (values.unit ?? "inches") as Unit;
+
   return {
-    openingWidth: Number(values.openingWidth),
-    drawerDepth: Number(values.drawerDepth),
+    openingWidth: parseMeasurementInput(values.openingWidth, unit, "opening width"),
+    drawerDepth: parseMeasurementInput(values.drawerDepth, unit, "drawer depth"),
     slideType: (values.slideType ?? "side-mount") as DrawerSlideType,
-    slideClearance: Number(values.slideClearance),
-    materialThickness: Number(values.materialThickness),
+    slideClearance: parseMeasurementInput(values.slideClearance, unit, "slide clearance"),
+    materialThickness: parseMeasurementInput(values.materialThickness, unit, "material thickness"),
     joineryType: (values.joineryType ?? "dado") as JoineryType,
-    bottomInsetDepth: Number(values.bottomInsetDepth),
-    bottomThickness: Number(values.bottomThickness),
-    unit: (values.unit ?? "inches") as Unit,
+    bottomInsetDepth: parseMeasurementInput(values.bottomInsetDepth ?? "0.25", unit, "bottom inset depth"),
+    bottomThickness: parseMeasurementInput(values.bottomThickness ?? "0.25", unit, "bottom thickness"),
+    unit,
     toolContext: (values.toolContext ?? "none") as ToolContext,
   };
 }

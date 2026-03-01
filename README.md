@@ -98,6 +98,8 @@ Examples:
 - Cut list layout uses deterministic heuristics, not a global optimum nesting solver.
 - New fabrication commands output copy-ready dimensions plus JSON export for downstream workflows.
 - Force-vector safety prompts are integrated by tool context (`router`, `table-saw`, `drill`, `pocket-screw`).
+- Most numeric fields now accept mixed input styles (`12-7/8`, `35mm`, `2.54cm`) and convert automatically to selected units.
+- New fabrication commands include `Basic` and `Advanced` modes to reduce form complexity for first-time users.
 
 ## Production Checklist (Raycast Store)
 

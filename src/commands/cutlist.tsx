@@ -12,6 +12,7 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { calculateCutList, formatCutListResult } from "../lib/cutlist";
+import { parseMeasurementInput } from "../lib/measurements";
 import { CutListInput, CutListResult, CutPiece, ExtensionPreferences, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
 
@@ -67,18 +68,18 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
 
   async function handleSubmit(values: CutListFormValues) {
     try {
-      const pieces = buildPieces(values);
+      const pieces = buildPieces(values, values.unit);
 
       const input: CutListInput = {
         pieces,
         stock: {
           type: values.stockType,
-          length: Number(values.stockLength),
-          width: Number(values.stockWidth),
+          length: parseMeasurementInput(values.stockLength, values.unit, "stock length"),
+          width: parseMeasurementInput(values.stockWidth, values.unit, "stock width"),
           unit: values.unit,
         },
         unit: values.unit,
-        kerf: Number(values.kerf || prefs.kerfWidth || "0.125"),
+        kerf: parseMeasurementInput(values.kerf || prefs.kerfWidth || "0.125", values.unit, "kerf"),
         allowRotation: values.allowRotation === "true",
       };
 
@@ -124,7 +125,7 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
         title="Length"
         defaultValue={prefill.piece1Length}
         placeholder="3.25"
-        info="Cut length for this piece type."
+        info='Cut length (accepts suffix/fraction: 3.25, 82.5mm, 3-1/4").'
         autoFocus
       />
       <Form.TextField
@@ -132,7 +133,7 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
         title="Width"
         defaultValue={prefill.piece1Width}
         placeholder="1.5"
-        info="Cut width for this piece type."
+        info='Cut width (accepts suffix/fraction: 1.5, 38mm, 1-1/2").'
       />
       <Form.TextField
         id="piece1Qty"
@@ -174,14 +175,14 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
         title="Stock Length"
         defaultValue={prefill.stockLength}
         placeholder="96"
-        info="For boards: board length. For sheets: sheet long side."
+        info="For boards: board length. For sheets: long side. Accepts suffix/fraction."
       />
       <Form.TextField
         id="stockWidth"
         title="Stock Width"
         defaultValue={prefill.stockWidth}
         placeholder="3.5"
-        info="For boards: board width/thickness. For sheets: sheet short side."
+        info="For boards: board width/thickness. For sheets: short side. Accepts suffix/fraction."
       />
       <Form.Dropdown id="unit" title="Unit" defaultValue={prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches"}>
         <Form.Dropdown.Item value="inches" title="Inches" />
@@ -193,7 +194,7 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
         title="Saw Blade Thickness (kerf)"
         defaultValue={prefill.kerf}
         placeholder={prefs.kerfWidth ?? "0.125"}
-        info="Width of material removed per cut (often 0.125 in = 1/8 in)."
+        info='Width removed per cut (accepts suffix/fraction: 0.125, 3.2mm, 1/8").'
       />
       <Form.Dropdown
         id="allowRotation"
@@ -238,7 +239,7 @@ function CutListResultView({ result, unit }: { result: CutListResult; unit: Unit
   );
 }
 
-function buildPieces(values: CutListFormValues): CutPiece[] {
+function buildPieces(values: CutListFormValues, unit: Unit): CutPiece[] {
   const rows = [
     {
       length: values.piece1Length,
@@ -282,8 +283,8 @@ function buildPieces(values: CutListFormValues): CutPiece[] {
       throw new Error(`Piece type ${row.index}: provide length, width, and quantity.`);
     }
 
-    const length = Number(row.length);
-    const width = Number(row.width);
+    const length = parseMeasurementInput(row.length, unit, `piece type ${row.index} length`);
+    const width = parseMeasurementInput(row.width, unit, `piece type ${row.index} width`);
     const quantity = Number(row.qty);
 
     if (!Number.isFinite(length) || length <= 0) {

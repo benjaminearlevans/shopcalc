@@ -13,7 +13,7 @@ import {
 } from "@raycast/api";
 import { useMemo, useState } from "react";
 import { convertUnits } from "../lib/conversion";
-import { parseInchValue } from "../lib/fractions";
+import { parseMeasurementInput } from "../lib/measurements";
 import { ConversionInput, ConversionResult, ExtensionPreferences, FractionPrecision, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
 
@@ -52,7 +52,7 @@ export default function ConvertCommand(props: LaunchProps<{ arguments: ConvertAr
     if (fromUnit === "cm") {
       return "Example: 32.7 or 32.7cm";
     }
-    return "Example: 476 or 476mm";
+    return 'Examples: 476, 476mm, 12-7/8", 32.7cm';
   }, [fromUnit]);
 
   const preview = useMemo(() => {
@@ -61,7 +61,7 @@ export default function ConvertCommand(props: LaunchProps<{ arguments: ConvertAr
     }
 
     try {
-      const parsed = parseMeasurementInput(valueInput, fromUnit);
+      const parsed = parseMeasurementInput(valueInput, fromUnit, "conversion value");
       const previewResult = convertUnits({
         value: parsed,
         from: fromUnit,
@@ -83,7 +83,7 @@ export default function ConvertCommand(props: LaunchProps<{ arguments: ConvertAr
   async function handleSubmit(values: ConvertFormValues) {
     try {
       const input: ConversionInput = {
-        value: parseMeasurementInput(values.value, values.from),
+        value: parseMeasurementInput(values.value, values.from, "conversion value"),
         from: values.from,
         to: values.to,
         precision: Number(values.precision || prefs.fractionPrecision || "16") as FractionPrecision,
@@ -195,29 +195,6 @@ function parseConvertPrefill(raw?: string): Partial<ConvertFormValues> {
   } catch {
     return {};
   }
-}
-
-function parseMeasurementInput(raw: string, from: Unit): number {
-  if (from === "inches") {
-    return parseInchValue(raw);
-  }
-
-  const normalized = raw.trim().toLowerCase().replace(/\s+/g, "").replace(/,/g, "");
-
-  const match = normalized.match(/^(-?\d*\.?\d+)(mm|cm)?$/);
-  if (!match) {
-    throw new Error(`${from === "mm" ? "Millimeter" : "Centimeter"} input must be a number (example: 476 or 32.7cm)`);
-  }
-
-  const numeric = Number(match[1]);
-  const suffix = match[2];
-  if (!Number.isFinite(numeric)) {
-    throw new Error(`${from === "mm" ? "Millimeter" : "Centimeter"} input must be a number`);
-  }
-  if (suffix && suffix !== from) {
-    throw new Error(`Input unit suffix (${suffix}) does not match selected source unit (${from})`);
-  }
-  return numeric;
 }
 
 function nextAvailableUnit(excluded: Unit): Unit {

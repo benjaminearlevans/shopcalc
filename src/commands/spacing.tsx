@@ -12,6 +12,7 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useMemo, useState } from "react";
+import { parseMeasurementInput } from "../lib/measurements";
 import { calculateSpacing } from "../lib/spacing";
 import { ExtensionPreferences, SpacingInput, SpacingResult, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
@@ -74,14 +75,10 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
 
   async function handleSubmit(values: SpacingFormValues) {
     try {
-      const input = {
-        totalLength: Number(values.totalLength),
-        count: Number(values.count),
-        elementWidth: Number(values.elementWidth),
-        unit: (values.unit || prefs.defaultUnit || "inches") as Unit,
-        edgeOffset: values.edgeOffset ? Number(values.edgeOffset) : 0,
-        centerToCenter: values.centerToCenter === "true",
-      } as SpacingInput;
+      const input = buildSpacingInput(values);
+      if (!input) {
+        throw new Error("Enter total span, piece count, and piece width.");
+      }
 
       const result = calculateSpacing(input);
       await saveToHistory("spacing", input, result.summary);
@@ -124,7 +121,7 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
         value={totalLength}
         onChange={setTotalLength}
         placeholder="67.5"
-        info="The full distance you are filling with pieces. Example: inside frame width."
+        info='The full distance you are filling with pieces. Accepts suffix/fraction (example: 67.5, 1714.5mm, 67-1/2").'
         autoFocus
       />
       <Form.TextField
@@ -141,7 +138,7 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
         value={elementWidth}
         onChange={setElementWidth}
         placeholder="0.75"
-        info="Width of one piece (for example, slat thickness)."
+        info='Width of one piece. Accepts suffix/fraction (example: 0.75, 19mm, 3/4").'
       />
       <Form.Dropdown id="unit" title="Unit" value={unit} onChange={(value) => setUnit(value as Unit)}>
         <Form.Dropdown.Item value="inches" title="Inches" />
@@ -154,7 +151,7 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
         value={edgeOffset}
         onChange={setEdgeOffset}
         placeholder="0"
-        info="Extra empty space to keep at both ends. Use 0 for flush layout."
+        info='Extra empty space at both ends. Accepts suffix/fraction (example: 0, 2.5, 64mm, 2-1/2").'
       />
       <Form.Dropdown
         id="centerToCenter"
@@ -177,11 +174,11 @@ function buildSpacingInput(values: SpacingFormValues): SpacingInput | null {
   }
 
   return {
-    totalLength: Number(values.totalLength),
+    totalLength: parseMeasurementInput(values.totalLength, values.unit, "total span"),
     count: Number(values.count),
-    elementWidth: Number(values.elementWidth),
+    elementWidth: parseMeasurementInput(values.elementWidth, values.unit, "piece width"),
     unit: values.unit,
-    edgeOffset: values.edgeOffset ? Number(values.edgeOffset) : 0,
+    edgeOffset: values.edgeOffset ? parseMeasurementInput(values.edgeOffset, values.unit, "edge offset") : 0,
     centerToCenter: values.centerToCenter === "true",
   };
 }

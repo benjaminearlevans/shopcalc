@@ -12,6 +12,7 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useMemo, useState } from "react";
+import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
 import { calculateScribePlan } from "../lib/scribe-planner";
 import { ExtensionPreferences, ScribePlannerInput, ScribePlannerResult, ToolContext, Unit } from "../types";
@@ -25,6 +26,7 @@ interface ScribeFormValues {
   desiredVisibleWidth: string;
   unit: Unit;
   toolContext: ToolContext;
+  detailMode: "basic" | "advanced";
 }
 
 type ScribeArgs = {
@@ -43,6 +45,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
   const [desiredVisibleWidth, setDesiredVisibleWidth] = useState(prefill.desiredVisibleWidth ?? "");
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
+  const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
 
   const preview = useMemo(() => {
     try {
@@ -54,6 +57,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
         desiredVisibleWidth,
         unit,
         toolContext,
+        detailMode,
       });
       if (!input) {
         return "Live preview: enter nominal width and target visible width.";
@@ -91,6 +95,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
     setDesiredVisibleWidth("29.5");
     setUnit("inches");
     setToolContext("router");
+    setDetailMode("advanced");
   }
 
   return (
@@ -107,12 +112,22 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
       }
     >
       <Form.Description text="Plan oversize and scribe allowance from measured wall deviations." />
+      <Form.Dropdown
+        id="detailMode"
+        title="Mode"
+        value={detailMode}
+        onChange={(value) => setDetailMode(value as "basic" | "advanced")}
+      >
+        <Form.Dropdown.Item value="basic" title="Basic" />
+        <Form.Dropdown.Item value="advanced" title="Advanced" />
+      </Form.Dropdown>
       <Form.TextField
         id="nominalWallWidth"
         title="Nominal Wall Width"
         value={nominalWallWidth}
         onChange={setNominalWallWidth}
         placeholder="30"
+        info="Original wall opening width. Accepts suffix/fraction."
         autoFocus
       />
       <Form.TextField
@@ -121,6 +136,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
         value={desiredVisibleWidth}
         onChange={setDesiredVisibleWidth}
         placeholder="29.5"
+        info="Target installed visible width after scribing. Accepts suffix/fraction."
       />
       <Form.TextField
         id="highDeviation"
@@ -128,6 +144,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
         value={highDeviation}
         onChange={setHighDeviation}
         placeholder="0.12"
+        info="Positive for proud/high spots; negative if recessed. Accepts suffix/fraction."
       />
       <Form.TextField
         id="lowDeviation"
@@ -135,6 +152,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
         value={lowDeviation}
         onChange={setLowDeviation}
         placeholder="-0.08"
+        info="Deviation at low point. Negative allowed. Accepts suffix/fraction."
       />
       <Form.TextField
         id="plumbDeviation"
@@ -142,24 +160,28 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
         value={plumbDeviation}
         onChange={setPlumbDeviation}
         placeholder="0.1"
+        info="Out-of-plumb deviation over panel height. Negative allowed. Accepts suffix/fraction."
       />
       <Form.Dropdown id="unit" title="Unit" value={unit} onChange={(value) => setUnit(value as Unit)}>
         <Form.Dropdown.Item value="inches" title="Inches" />
         <Form.Dropdown.Item value="mm" title="Millimeters" />
         <Form.Dropdown.Item value="cm" title="Centimeters" />
       </Form.Dropdown>
-      <Form.Dropdown
-        id="toolContext"
-        title="Safety Tool Context"
-        value={toolContext}
-        onChange={(value) => setToolContext(value as ToolContext)}
-      >
-        <Form.Dropdown.Item value="none" title="None" />
-        <Form.Dropdown.Item value="router" title="Router" />
-        <Form.Dropdown.Item value="table-saw" title="Table Saw" />
-        <Form.Dropdown.Item value="drill" title="Drill" />
-        <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
-      </Form.Dropdown>
+      {detailMode === "advanced" ? (
+        <Form.Dropdown
+          id="toolContext"
+          title="Safety Tool Context"
+          value={toolContext}
+          onChange={(value) => setToolContext(value as ToolContext)}
+          info="Shows force-vector safety checklist in the output."
+        >
+          <Form.Dropdown.Item value="none" title="None" />
+          <Form.Dropdown.Item value="router" title="Router" />
+          <Form.Dropdown.Item value="table-saw" title="Table Saw" />
+          <Form.Dropdown.Item value="drill" title="Drill" />
+          <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
+        </Form.Dropdown>
+      ) : null}
       <Form.Separator />
       <Form.Description text={preview} />
     </Form>
@@ -167,13 +189,51 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
 }
 
 function ScribeResultView({ result }: { result: ScribePlannerResult }) {
-  const markdown = [result.summary, "", formatSafetyChecklist(result.input.toolContext)].join("\n\n");
+  const warningStatus = result.warnings.length ? `Caution (${result.warnings.length})` : "Clear";
+  const deviationTable = [
+    "| Measure | Value |",
+    "| --- | --- |",
+    `| High deviation | ${result.input.highDeviation.toFixed(3)} ${result.input.unit} |`,
+    `| Low deviation | ${result.input.lowDeviation.toFixed(3)} ${result.input.unit} |`,
+    `| Plumb deviation | ${result.input.plumbDeviation.toFixed(3)} ${result.input.unit} |`,
+  ].join("\n");
+  const markdown = [
+    result.summary,
+    "",
+    "**Deviation Table**",
+    deviationTable,
+    "",
+    formatSafetyChecklist(result.input.toolContext),
+  ].join("\n\n");
   return (
     <Detail
       markdown={markdown}
+      metadata={
+        <Detail.Metadata>
+          <Detail.Metadata.Label
+            title="Rough Cut"
+            text={`${result.roughCutDimension.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label
+            title="Oversize Margin"
+            text={`${result.oversizeMargin.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label
+            title="Max Scribe Allowance"
+            text={`${result.maximumScribeAllowance.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.TagList title="Warnings">
+            <Detail.Metadata.TagList.Item text={warningStatus} color={result.warnings.length ? "#FF7A00" : "#0CA678"} />
+          </Detail.Metadata.TagList>
+        </Detail.Metadata>
+      }
       actions={
         <ActionPanel>
           <Action.CopyToClipboard title="Copy Summary" content={markdown.replace(/\*\*/g, "")} />
+          <Action.CopyToClipboard
+            title="Copy Rough Cut + Scribe"
+            content={`Rough cut: ${result.roughCutDimension.toFixed(3)} ${result.input.unit}\nOversize: ${result.oversizeMargin.toFixed(3)} ${result.input.unit}\nMax scribe: ${result.maximumScribeAllowance.toFixed(3)} ${result.input.unit}`}
+          />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
         </ActionPanel>
       }
@@ -186,11 +246,15 @@ function parseInput(values: Partial<ScribeFormValues>): ScribePlannerInput | nul
     return null;
   }
   return {
-    nominalWallWidth: Number(values.nominalWallWidth),
-    highDeviation: Number(values.highDeviation || "0"),
-    lowDeviation: Number(values.lowDeviation || "0"),
-    plumbDeviation: Number(values.plumbDeviation || "0"),
-    desiredVisibleWidth: Number(values.desiredVisibleWidth),
+    nominalWallWidth: parseMeasurementInput(values.nominalWallWidth, values.unit ?? "inches", "nominal wall width"),
+    highDeviation: parseMeasurementInput(values.highDeviation || "0", values.unit ?? "inches", "high deviation"),
+    lowDeviation: parseMeasurementInput(values.lowDeviation || "0", values.unit ?? "inches", "low deviation"),
+    plumbDeviation: parseMeasurementInput(values.plumbDeviation || "0", values.unit ?? "inches", "plumb deviation"),
+    desiredVisibleWidth: parseMeasurementInput(
+      values.desiredVisibleWidth,
+      values.unit ?? "inches",
+      "desired final visible width",
+    ),
     unit: (values.unit ?? "inches") as Unit,
     toolContext: (values.toolContext ?? "none") as ToolContext,
   };

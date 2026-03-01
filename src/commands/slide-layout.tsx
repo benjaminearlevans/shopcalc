@@ -12,6 +12,7 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useMemo, useState } from "react";
+import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
 import { calculateSlideLayout } from "../lib/slide-layout";
 import { ExtensionPreferences, SlideLayoutInput, SlideLayoutResult, ToolContext, Unit } from "../types";
@@ -25,6 +26,7 @@ interface SlideFormValues {
   slideThickness: string;
   unit: Unit;
   toolContext: ToolContext;
+  detailMode: "basic" | "advanced";
 }
 
 type SlideArgs = {
@@ -43,6 +45,7 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
   const [slideThickness, setSlideThickness] = useState(prefill.slideThickness ?? "0.5");
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
+  const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
 
   const preview = useMemo(() => {
     try {
@@ -54,6 +57,7 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
         slideThickness,
         unit,
         toolContext,
+        detailMode,
       });
       if (!input) {
         return "Live preview: enter cabinet height and drawer count.";
@@ -91,6 +95,7 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
     setSlideThickness("0.5");
     setUnit("inches");
     setToolContext("table-saw");
+    setDetailMode("advanced");
   }
 
   return (
@@ -107,12 +112,22 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
       }
     >
       <Form.Description text="Generate baseline-driven vertical slide placement and spacer block dimensions." />
+      <Form.Dropdown
+        id="detailMode"
+        title="Mode"
+        value={detailMode}
+        onChange={(value) => setDetailMode(value as "basic" | "advanced")}
+      >
+        <Form.Dropdown.Item value="basic" title="Basic" />
+        <Form.Dropdown.Item value="advanced" title="Advanced" />
+      </Form.Dropdown>
       <Form.TextField
         id="cabinetInteriorHeight"
         title="Cabinet Interior Height"
         value={cabinetInteriorHeight}
         onChange={setCabinetInteriorHeight}
         placeholder="30"
+        info='Inside clear cabinet height. Accepts suffix/fraction (30, 762mm, 30").'
         autoFocus
       />
       <Form.TextField
@@ -121,33 +136,52 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
         value={drawerCount}
         onChange={setDrawerCount}
         placeholder="4"
+        info="Count of drawer slide levels to place."
       />
-      <Form.TextField id="topMargin" title="Top Margin" value={topMargin} onChange={setTopMargin} placeholder="2" />
-      <Form.TextField id="gapSpacing" title="Gap Spacing" value={gapSpacing} onChange={setGapSpacing} placeholder="6" />
+      <Form.TextField
+        id="topMargin"
+        title="Top Margin"
+        value={topMargin}
+        onChange={setTopMargin}
+        placeholder="2"
+        info="Offset from top edge to first slide. Accepts suffix/fraction."
+      />
+      <Form.TextField
+        id="gapSpacing"
+        title="Gap Spacing"
+        value={gapSpacing}
+        onChange={setGapSpacing}
+        placeholder="6"
+        info="Vertical gap between slide levels. Accepts suffix/fraction."
+      />
       <Form.TextField
         id="slideThickness"
         title="Slide Thickness"
         value={slideThickness}
         onChange={setSlideThickness}
         placeholder="0.5"
+        info="Installed slide stack thickness. Accepts suffix/fraction."
       />
       <Form.Dropdown id="unit" title="Unit" value={unit} onChange={(value) => setUnit(value as Unit)}>
         <Form.Dropdown.Item value="inches" title="Inches" />
         <Form.Dropdown.Item value="mm" title="Millimeters" />
         <Form.Dropdown.Item value="cm" title="Centimeters" />
       </Form.Dropdown>
-      <Form.Dropdown
-        id="toolContext"
-        title="Safety Tool Context"
-        value={toolContext}
-        onChange={(value) => setToolContext(value as ToolContext)}
-      >
-        <Form.Dropdown.Item value="none" title="None" />
-        <Form.Dropdown.Item value="router" title="Router" />
-        <Form.Dropdown.Item value="table-saw" title="Table Saw" />
-        <Form.Dropdown.Item value="drill" title="Drill" />
-        <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
-      </Form.Dropdown>
+      {detailMode === "advanced" ? (
+        <Form.Dropdown
+          id="toolContext"
+          title="Safety Tool Context"
+          value={toolContext}
+          onChange={(value) => setToolContext(value as ToolContext)}
+          info="Shows force-vector safety checklist in the output."
+        >
+          <Form.Dropdown.Item value="none" title="None" />
+          <Form.Dropdown.Item value="router" title="Router" />
+          <Form.Dropdown.Item value="table-saw" title="Table Saw" />
+          <Form.Dropdown.Item value="drill" title="Drill" />
+          <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
+        </Form.Dropdown>
+      ) : null}
       <Form.Separator />
       <Form.Description text={preview} />
     </Form>
@@ -155,15 +189,52 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
 }
 
 function SlideResultView({ result }: { result: SlideLayoutResult }) {
+  const coordinateTable = [
+    "| Drawer | Top Y | Center Y | Bottom Y |",
+    "| --- | --- | --- | --- |",
+    ...result.coordinates.map(
+      (row) =>
+        `| ${row.drawerIndex} | ${row.topY.toFixed(3)} ${result.input.unit} | ${row.centerY.toFixed(3)} ${result.input.unit} | ${row.bottomY.toFixed(3)} ${result.input.unit} |`,
+    ),
+  ].join("\n");
   const markdown = [result.summary, "", result.diagram, "", formatSafetyChecklist(result.input.toolContext)].join(
     "\n\n",
   );
   return (
     <Detail
-      markdown={markdown}
+      markdown={[markdown, "", "**Coordinate Table**", coordinateTable].join("\n\n")}
+      metadata={
+        <Detail.Metadata>
+          <Detail.Metadata.Label title="Slide Levels" text={`${result.coordinates.length}`} />
+          <Detail.Metadata.Label
+            title="Spacer Block Height"
+            text={`${result.spacerBlockHeight.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.Label
+            title="Baseline Offset"
+            text={`${result.laserBaselineOffset.toFixed(3)} ${result.input.unit}`}
+          />
+          <Detail.Metadata.TagList title="Warnings">
+            <Detail.Metadata.TagList.Item text="None" color="#0CA678" />
+          </Detail.Metadata.TagList>
+        </Detail.Metadata>
+      }
       actions={
         <ActionPanel>
           <Action.CopyToClipboard title="Copy Summary" content={markdown.replace(/\*\*/g, "")} />
+          <Action.CopyToClipboard
+            title="Copy Coordinates"
+            content={result.coordinates
+              .map(
+                (row) =>
+                  `Drawer ${row.drawerIndex}: top ${row.topY.toFixed(3)}, center ${row.centerY.toFixed(3)}, bottom ${row.bottomY.toFixed(3)} ${result.input.unit}`,
+              )
+              .join("\n")}
+          />
+          <Action.CopyToClipboard
+            title="Copy Spacer Block"
+            content={`${result.spacerBlockHeight.toFixed(3)} ${result.input.unit}`}
+          />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
         </ActionPanel>
       }
@@ -182,11 +253,15 @@ function parseInput(values: Partial<SlideFormValues>): SlideLayoutInput | null {
     return null;
   }
   return {
-    cabinetInteriorHeight: Number(values.cabinetInteriorHeight),
+    cabinetInteriorHeight: parseMeasurementInput(
+      values.cabinetInteriorHeight,
+      values.unit ?? "inches",
+      "cabinet interior height",
+    ),
     drawerCount: Number(values.drawerCount),
-    topMargin: Number(values.topMargin),
-    gapSpacing: Number(values.gapSpacing),
-    slideThickness: Number(values.slideThickness),
+    topMargin: parseMeasurementInput(values.topMargin, values.unit ?? "inches", "top margin"),
+    gapSpacing: parseMeasurementInput(values.gapSpacing, values.unit ?? "inches", "gap spacing"),
+    slideThickness: parseMeasurementInput(values.slideThickness, values.unit ?? "inches", "slide thickness"),
     unit: (values.unit ?? "inches") as Unit,
     toolContext: (values.toolContext ?? "none") as ToolContext,
   };

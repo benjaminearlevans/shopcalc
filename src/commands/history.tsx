@@ -14,6 +14,7 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
+import { useMemo, useState } from "react";
 import { calculateAngle } from "../lib/angles";
 import { convertUnits } from "../lib/conversion";
 import { calculateCutList, formatCutListResult } from "../lib/cutlist";
@@ -44,6 +45,14 @@ import { clearHistory, getHistory } from "../utils/history";
 export default function HistoryCommand() {
   const { push } = useNavigation();
   const { data: history = [], isLoading, revalidate } = useCachedPromise(getHistory, []);
+  const [filter, setFilter] = useState<HistoryFilter>("all");
+
+  const filteredHistory = useMemo(() => {
+    if (filter === "all") {
+      return history;
+    }
+    return history.filter((entry) => historyCategory(entry.type) === filter);
+  }, [history, filter]);
 
   async function handleClearHistory() {
     const confirmed = await confirmAlert({
@@ -117,6 +126,16 @@ export default function HistoryCommand() {
     <List
       isLoading={isLoading}
       searchBarPlaceholder="Search recent calculations"
+      searchBarAccessory={
+        <List.Dropdown tooltip="Category Filter" value={filter} onChange={(value) => setFilter(value as HistoryFilter)}>
+          <List.Dropdown.Item value="all" title="All" />
+          <List.Dropdown.Item value="layout" title="Layout" />
+          <List.Dropdown.Item value="joinery" title="Joinery" />
+          <List.Dropdown.Item value="installation" title="Installation" />
+          <List.Dropdown.Item value="safety" title="Safety" />
+          <List.Dropdown.Item value="conversion" title="Conversion" />
+        </List.Dropdown>
+      }
       actions={
         <ActionPanel>
           <Action
@@ -128,9 +147,10 @@ export default function HistoryCommand() {
         </ActionPanel>
       }
     >
-      {!history.length && !isLoading ? <List.EmptyView title="No calculations saved" /> : null}
-      {history.map((entry) => {
+      {!filteredHistory.length && !isLoading ? <List.EmptyView title="No calculations match this filter" /> : null}
+      {filteredHistory.map((entry) => {
         const preview = historyPreview(entry);
+        const category = historyCategory(entry.type);
 
         return (
           <List.Item
@@ -138,7 +158,11 @@ export default function HistoryCommand() {
             icon={iconForType(entry.type)}
             title={preview.title}
             subtitle={preview.subtitle}
-            accessories={[{ tag: typeTitle(entry) }, { date: new Date(entry.timestamp) }]}
+            accessories={[
+              { tag: typeTitle(entry) },
+              { tag: categoryTitle(category) },
+              { date: new Date(entry.timestamp) },
+            ]}
             actions={
               <ActionPanel>
                 <Action title="View Summary" onAction={() => push(<Detail markdown={entry.summary} />)} />
@@ -160,6 +184,8 @@ export default function HistoryCommand() {
     </List>
   );
 }
+
+type HistoryFilter = "all" | "layout" | "joinery" | "installation" | "safety" | "conversion";
 
 function recomputeMarkdown(entry: HistoryEntry): string {
   if (entry.type === "spacing") {
@@ -362,4 +388,36 @@ function mapHistoryTypeToCommand(type: HistoryEntry["type"]): string {
     default:
       return type;
   }
+}
+
+function historyCategory(type: HistoryEntry["type"]): Exclude<HistoryFilter, "all"> {
+  if (type === "spacing" || type === "slide-layout" || type === "scribe-planner") {
+    return "layout";
+  }
+  if (type === "drawer-box" || type === "hinge-layout" || type === "cutlist" || type === "angle") {
+    return "joinery";
+  }
+  if (type === "drill-depth") {
+    return "safety";
+  }
+  if (type === "quick-convert" || type === "conversion") {
+    return "conversion";
+  }
+  return "installation";
+}
+
+function categoryTitle(category: Exclude<HistoryFilter, "all">): string {
+  if (category === "layout") {
+    return "Layout";
+  }
+  if (category === "joinery") {
+    return "Joinery";
+  }
+  if (category === "safety") {
+    return "Safety";
+  }
+  if (category === "conversion") {
+    return "Conversion";
+  }
+  return "Installation";
 }
