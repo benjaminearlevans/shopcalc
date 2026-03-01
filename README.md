@@ -1,6 +1,6 @@
 # ShopCalc
 
-ShopCalc is a Raycast extension for woodworking calculations with a beginner-friendly flow.
+ShopCalc is a Raycast extension for woodworking and fabrication calculations with a beginner-friendly flow.
 
 ## Start Here
 
@@ -34,7 +34,32 @@ ShopCalc is a Raycast extension for woodworking calculations with a beginner-fri
 - Starts with task intent (corner, stairs, polygon, advanced).
 - Output: saw settings + next-step instructions.
 
-6. `Calculation History`
+6. `Drawer Box Engine`
+
+- Inputs: opening width, drawer depth, slide mode/clearance, material thickness, joinery, bottom inset/thickness.
+- Output: side and front/back panel dimensions, bottom panel size, joinery rabbet values, clearance warnings.
+
+7. `Hinge Layout Generator`
+
+- Inputs: door height, top/bottom offsets, cup diameter, edge setback, overlay/inset.
+- Output: mirror-safe drilling coordinates, template reference, optional STL parameter JSON.
+
+8. `Slide Spacer Generator`
+
+- Inputs: cabinet interior height, drawer count, top margin, gap spacing, slide thickness.
+- Output: exact vertical slide coordinates, spacer block size, baseline offset system.
+
+9. `Scribe & Oversize Planner`
+
+- Inputs: nominal width, high/low/plumb deviations, desired visible width.
+- Output: recommended rough-cut dimension, oversize margin, max scribe allowance, shim-risk flag.
+
+10. `Drill Depth & Stop Control`
+
+- Inputs: desired hole depth, material thickness, fastener length, optional screw diameter/type.
+- Output: stop collar setting, minimum safe drilling depth, through-hole warning, pilot recommendation.
+
+11. `Calculation History`
 
 - Keeps the last 10 calculations.
 - Actions: view, rerun, edit inputs, copy summary, copy inputs JSON, clear history.
@@ -47,6 +72,11 @@ Use with Raycast AI (`@ShopCalc`):
 - `convert-units`
 - `calculate-cutlist`
 - `calculate-angle`
+- `calculate-drawer-box`
+- `generate-hinge-layout`
+- `generate-slide-layout`
+- `plan-scribe-oversize`
+- `calculate-drill-depth`
 
 Examples:
 
@@ -55,12 +85,19 @@ Examples:
 - `@ShopCalc convert 32.7cm to inches`
 - `@ShopCalc what angle for a 36 degree stair pitch`
 - `@ShopCalc 24 pieces at 3.25 inches from 8 foot boards with 1/8 kerf`
+- `@ShopCalc drawer box for 21 inch opening, side mount slides, 3/4 material`
+- `@ShopCalc hinge coordinates for 716mm door with 100mm top and bottom offsets`
+- `@ShopCalc slide layout for 4 drawers in 30 inch cabinet interior`
+- `@ShopCalc scribe oversize plan with 0.12 high and -0.08 low deviation`
+- `@ShopCalc drill stop for 0.75 depth in 7/8 stock with 1.25 screw`
 
 ## Notes
 
 - All direct command calculations run locally.
 - Fraction precision supports 1/8, 1/16, 1/32, and 1/64.
 - Cut list layout uses deterministic heuristics, not a global optimum nesting solver.
+- New fabrication commands output copy-ready dimensions plus JSON export for downstream workflows.
+- Force-vector safety prompts are integrated by tool context (`router`, `table-saw`, `drill`, `pocket-screw`).
 
 ## Production Checklist (Raycast Store)
 

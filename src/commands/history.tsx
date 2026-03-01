@@ -17,15 +17,25 @@ import { useCachedPromise } from "@raycast/utils";
 import { calculateAngle } from "../lib/angles";
 import { convertUnits } from "../lib/conversion";
 import { calculateCutList, formatCutListResult } from "../lib/cutlist";
+import { calculateDrawerBox } from "../lib/drawer-box";
+import { calculateDrillDepth } from "../lib/drill-depth";
+import { calculateHingeLayout } from "../lib/hinge-layout";
 import { evaluateQuickConversion } from "../lib/quick-convert";
+import { calculateScribePlan } from "../lib/scribe-planner";
 import { calculateSpacing } from "../lib/spacing";
+import { calculateSlideLayout } from "../lib/slide-layout";
 import {
   AngleInput,
   ConversionInput,
   CutListInput,
+  DrawerBoxInput,
+  DrillDepthInput,
   FractionPrecision,
+  HingeLayoutInput,
   HistoryEntry,
   QuickConvertHistoryInput,
+  ScribePlannerInput,
+  SlideLayoutInput,
   SpacingInput,
   Unit,
 } from "../types";
@@ -88,7 +98,7 @@ export default function HistoryCommand() {
         return;
       }
 
-      const commandName = entry.type === "conversion" ? "convert" : entry.type;
+      const commandName = mapHistoryTypeToCommand(entry.type);
       await launchCommand({
         name: commandName,
         type: LaunchType.UserInitiated,
@@ -171,6 +181,31 @@ function recomputeMarkdown(entry: HistoryEntry): string {
     return formatCutListResult(result, (entry.input as CutListInput).unit as Unit);
   }
 
+  if (entry.type === "drawer-box") {
+    const result = calculateDrawerBox(entry.input as DrawerBoxInput);
+    return [result.summary, "", result.diagram].join("\n");
+  }
+
+  if (entry.type === "hinge-layout") {
+    const result = calculateHingeLayout(entry.input as HingeLayoutInput);
+    return result.summary;
+  }
+
+  if (entry.type === "slide-layout") {
+    const result = calculateSlideLayout(entry.input as SlideLayoutInput);
+    return [result.summary, "", result.diagram].join("\n");
+  }
+
+  if (entry.type === "scribe-planner") {
+    const result = calculateScribePlan(entry.input as ScribePlannerInput);
+    return result.summary;
+  }
+
+  if (entry.type === "drill-depth") {
+    const result = calculateDrillDepth(entry.input as DrillDepthInput);
+    return result.summary;
+  }
+
   const result = calculateAngle(entry.input as AngleInput);
   return [result.summary, "", `**Saw setting**: ${result.bladeSetting}`].join("\n");
 }
@@ -209,6 +244,46 @@ function historyPreview(entry: HistoryEntry): { title: string; subtitle: string 
     };
   }
 
+  if (entry.type === "drawer-box") {
+    const input = entry.input as DrawerBoxInput;
+    return {
+      title: `Drawer ${input.openingWidth} ${input.unit} opening`,
+      subtitle: "Drawer box engine",
+    };
+  }
+
+  if (entry.type === "hinge-layout") {
+    const input = entry.input as HingeLayoutInput;
+    return {
+      title: `Door ${input.doorHeight} ${input.unit}, ${input.mode}`,
+      subtitle: "Hinge layout",
+    };
+  }
+
+  if (entry.type === "slide-layout") {
+    const input = entry.input as SlideLayoutInput;
+    return {
+      title: `${input.drawerCount} drawers in ${input.cabinetInteriorHeight} ${input.unit}`,
+      subtitle: "Slide layout",
+    };
+  }
+
+  if (entry.type === "scribe-planner") {
+    const input = entry.input as ScribePlannerInput;
+    return {
+      title: `Scribe plan ${input.desiredVisibleWidth} ${input.unit}`,
+      subtitle: "Oversize planner",
+    };
+  }
+
+  if (entry.type === "drill-depth") {
+    const input = entry.input as DrillDepthInput;
+    return {
+      title: `Depth ${input.desiredHoleDepth} ${input.unit}`,
+      subtitle: "Drill depth control",
+    };
+  }
+
   const input = entry.input as AngleInput;
   return {
     title: `Angle task (${input.mode})`,
@@ -228,6 +303,16 @@ function typeTitle(entry: HistoryEntry): string {
       return "Angle";
     case "quick-convert":
       return "Quick Convert";
+    case "drawer-box":
+      return "Drawer";
+    case "hinge-layout":
+      return "Hinge";
+    case "slide-layout":
+      return "Slide";
+    case "scribe-planner":
+      return "Scribe";
+    case "drill-depth":
+      return "Drill";
     default:
       return "Calculation";
   }
@@ -245,7 +330,36 @@ function iconForType(type: HistoryEntry["type"]): { source: Icon; tintColor: Col
       return { source: Icon.Compass, tintColor: Color.Green };
     case "quick-convert":
       return { source: Icon.Bolt, tintColor: Color.Yellow };
+    case "drawer-box":
+      return { source: Icon.Hammer, tintColor: Color.Red };
+    case "hinge-layout":
+      return { source: Icon.Pin, tintColor: Color.Purple };
+    case "slide-layout":
+      return { source: Icon.List, tintColor: Color.Orange };
+    case "scribe-planner":
+      return { source: Icon.Ruler, tintColor: Color.Blue };
+    case "drill-depth":
+      return { source: Icon.Bolt, tintColor: Color.Green };
     default:
       return { source: Icon.Document, tintColor: Color.SecondaryText };
+  }
+}
+
+function mapHistoryTypeToCommand(type: HistoryEntry["type"]): string {
+  switch (type) {
+    case "conversion":
+      return "convert";
+    case "drawer-box":
+      return "drawer-engine";
+    case "hinge-layout":
+      return "hinge-layout";
+    case "slide-layout":
+      return "slide-layout";
+    case "scribe-planner":
+      return "scribe-planner";
+    case "drill-depth":
+      return "drill-depth";
+    default:
+      return type;
   }
 }

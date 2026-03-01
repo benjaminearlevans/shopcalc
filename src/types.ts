@@ -1,5 +1,6 @@
 export type Unit = "inches" | "mm" | "cm";
 export type FractionPrecision = 8 | 16 | 32 | 64;
+export type ToolContext = "none" | "router" | "table-saw" | "drill" | "pocket-screw";
 
 export interface FractionalInch {
   decimal: number;
@@ -124,13 +125,157 @@ export interface AngleResult {
   bladeSetting: string;
 }
 
-export type CalculationType = "spacing" | "conversion" | "cutlist" | "angle" | "quick-convert";
+export type DrawerSlideType = "side-mount" | "undermount";
+export type JoineryType = "butt" | "rabbet" | "dado";
+
+export interface DrawerBoxInput {
+  openingWidth: number;
+  drawerDepth: number;
+  slideType: DrawerSlideType;
+  slideClearance: number;
+  materialThickness: number;
+  joineryType: JoineryType;
+  bottomInsetDepth: number;
+  bottomThickness: number;
+  unit: Unit;
+  toolContext?: ToolContext;
+}
+
+export interface DrawerBoxResult {
+  input: DrawerBoxInput;
+  sidePanelLength: number;
+  frontBackPanelLength: number;
+  bottomPanelWidth: number;
+  bottomPanelLength: number;
+  rabbetDepth: number;
+  rabbetWidth: number;
+  requiredSlideSpacing: number;
+  warnings: string[];
+  diagram: string;
+  summary: string;
+}
+
+export type HingeMode = "overlay" | "inset";
+
+export interface HingeLayoutInput {
+  doorHeight: number;
+  topHingeOffset: number;
+  bottomHingeOffset: number;
+  cupDiameter: number;
+  edgeSetback: number;
+  mode: HingeMode;
+  unit: Unit;
+  includeStlParams?: boolean;
+  toolContext?: ToolContext;
+}
+
+export interface HingeLayoutResult {
+  input: HingeLayoutInput;
+  topHoleY: number;
+  bottomHoleY: number;
+  cupCenterX: number;
+  mirrorSafe: boolean;
+  printableTemplateRef: string;
+  stlParams?: string;
+  warnings: string[];
+  summary: string;
+}
+
+export interface SlideLayoutInput {
+  cabinetInteriorHeight: number;
+  drawerCount: number;
+  topMargin: number;
+  gapSpacing: number;
+  slideThickness: number;
+  unit: Unit;
+  toolContext?: ToolContext;
+}
+
+export interface SlideCoordinate {
+  drawerIndex: number;
+  topY: number;
+  centerY: number;
+  bottomY: number;
+}
+
+export interface SlideLayoutResult {
+  input: SlideLayoutInput;
+  coordinates: SlideCoordinate[];
+  spacerBlockHeight: number;
+  laserBaselineOffset: number;
+  diagram: string;
+  summary: string;
+}
+
+export interface ScribePlannerInput {
+  nominalWallWidth: number;
+  highDeviation: number;
+  lowDeviation: number;
+  plumbDeviation: number;
+  desiredVisibleWidth: number;
+  unit: Unit;
+  toolContext?: ToolContext;
+}
+
+export interface ScribePlannerResult {
+  input: ScribePlannerInput;
+  roughCutDimension: number;
+  oversizeMargin: number;
+  maximumScribeAllowance: number;
+  exceedsShimTolerance: boolean;
+  warnings: string[];
+  summary: string;
+}
+
+export type ScrewType = "wood" | "sheet-metal" | "lag" | "confirmat" | "custom";
+
+export interface DrillDepthInput {
+  desiredHoleDepth: number;
+  materialThickness: number;
+  fastenerLength: number;
+  screwType?: ScrewType;
+  screwDiameter?: number;
+  unit: Unit;
+  toolContext?: ToolContext;
+}
+
+export interface DrillDepthResult {
+  input: DrillDepthInput;
+  stopCollarSetting: number;
+  minimumSafeDepth: number;
+  throughHoleRisk: boolean;
+  pilotHoleDiameter?: number;
+  warnings: string[];
+  summary: string;
+}
+
+export type CalculationType =
+  | "spacing"
+  | "conversion"
+  | "cutlist"
+  | "angle"
+  | "quick-convert"
+  | "drawer-box"
+  | "hinge-layout"
+  | "slide-layout"
+  | "scribe-planner"
+  | "drill-depth";
 
 export interface HistoryEntry {
   id: string;
   type: CalculationType;
   timestamp: number;
-  input: SpacingInput | ConversionInput | CutListInput | AngleInput | QuickConvertHistoryInput;
+  input:
+    | SpacingInput
+    | ConversionInput
+    | CutListInput
+    | AngleInput
+    | QuickConvertHistoryInput
+    | DrawerBoxInput
+    | HingeLayoutInput
+    | SlideLayoutInput
+    | ScribePlannerInput
+    | DrillDepthInput;
   summary: string;
 }
 

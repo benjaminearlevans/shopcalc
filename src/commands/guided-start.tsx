@@ -35,6 +35,56 @@ const EXAMPLES = {
     slopeAngle: 90,
     unit: "degrees",
   }),
+  drawer: JSON.stringify({
+    openingWidth: 21,
+    drawerDepth: 18,
+    slideType: "side-mount",
+    slideClearance: 0.5,
+    materialThickness: 0.75,
+    joineryType: "dado",
+    bottomInsetDepth: 0.25,
+    bottomThickness: 0.25,
+    unit: "inches",
+    toolContext: "table-saw",
+  }),
+  hinge: JSON.stringify({
+    doorHeight: 716,
+    topHingeOffset: 100,
+    bottomHingeOffset: 100,
+    cupDiameter: 35,
+    edgeSetback: 5,
+    mode: "overlay",
+    unit: "mm",
+    includeStlParams: true,
+    toolContext: "drill",
+  }),
+  slide: JSON.stringify({
+    cabinetInteriorHeight: 30,
+    drawerCount: 4,
+    topMargin: 2,
+    gapSpacing: 6,
+    slideThickness: 0.5,
+    unit: "inches",
+    toolContext: "table-saw",
+  }),
+  scribe: JSON.stringify({
+    nominalWallWidth: 30,
+    highDeviation: 0.12,
+    lowDeviation: -0.08,
+    plumbDeviation: 0.1,
+    desiredVisibleWidth: 29.5,
+    unit: "inches",
+    toolContext: "router",
+  }),
+  drill: JSON.stringify({
+    desiredHoleDepth: 0.75,
+    materialThickness: 0.875,
+    fastenerLength: 1.25,
+    screwType: "wood",
+    screwDiameter: 0.164,
+    unit: "inches",
+    toolContext: "drill",
+  }),
 };
 
 export default function GuidedStartCommand() {
@@ -140,6 +190,126 @@ export default function GuidedStartCommand() {
                   name: "angle",
                   type: LaunchType.UserInitiated,
                   arguments: { prefill: EXAMPLES.angle },
+                })
+              }
+            />
+          </ActionPanel>
+        }
+      />
+      <List.Item
+        icon={{ source: Icon.Hammer, tintColor: Color.Red }}
+        title="I need drawer box cut dimensions"
+        subtitle="Slide clearance + joinery-aware sizing"
+        accessories={[{ text: "Drawer Engine" }]}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Open Drawer Engine"
+              onAction={() => launchCommand({ name: "drawer-engine", type: LaunchType.UserInitiated })}
+            />
+            <Action
+              title="Open Drawer Example"
+              onAction={() =>
+                launchCommand({
+                  name: "drawer-engine",
+                  type: LaunchType.UserInitiated,
+                  arguments: { prefill: EXAMPLES.drawer },
+                })
+              }
+            />
+          </ActionPanel>
+        }
+      />
+      <List.Item
+        icon={{ source: Icon.Pin, tintColor: Color.Purple }}
+        title="I need hinge cup drill coordinates"
+        subtitle="Mirror-safe top/bottom layout"
+        accessories={[{ text: "Hinge Layout" }]}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Open Hinge Layout"
+              onAction={() => launchCommand({ name: "hinge-layout", type: LaunchType.UserInitiated })}
+            />
+            <Action
+              title="Open Hinge Example"
+              onAction={() =>
+                launchCommand({
+                  name: "hinge-layout",
+                  type: LaunchType.UserInitiated,
+                  arguments: { prefill: EXAMPLES.hinge },
+                })
+              }
+            />
+          </ActionPanel>
+        }
+      />
+      <List.Item
+        icon={{ source: Icon.List, tintColor: Color.Orange }}
+        title="I need drawer slide baseline coordinates"
+        subtitle="Spacer block and vertical placements"
+        accessories={[{ text: "Slide Layout" }]}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Open Slide Layout"
+              onAction={() => launchCommand({ name: "slide-layout", type: LaunchType.UserInitiated })}
+            />
+            <Action
+              title="Open Slide Example"
+              onAction={() =>
+                launchCommand({
+                  name: "slide-layout",
+                  type: LaunchType.UserInitiated,
+                  arguments: { prefill: EXAMPLES.slide },
+                })
+              }
+            />
+          </ActionPanel>
+        }
+      />
+      <List.Item
+        icon={{ source: Icon.Ruler, tintColor: Color.Blue }}
+        title="I need wall scribe oversize planning"
+        subtitle="Rough cut and shim-risk guidance"
+        accessories={[{ text: "Scribe Planner" }]}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Open Scribe Planner"
+              onAction={() => launchCommand({ name: "scribe-planner", type: LaunchType.UserInitiated })}
+            />
+            <Action
+              title="Open Scribe Example"
+              onAction={() =>
+                launchCommand({
+                  name: "scribe-planner",
+                  type: LaunchType.UserInitiated,
+                  arguments: { prefill: EXAMPLES.scribe },
+                })
+              }
+            />
+          </ActionPanel>
+        }
+      />
+      <List.Item
+        icon={{ source: Icon.Bolt, tintColor: Color.Green }}
+        title="I need drill stop depth settings"
+        subtitle="Stop collar + through-hole warnings"
+        accessories={[{ text: "Drill Depth" }]}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Open Drill Depth"
+              onAction={() => launchCommand({ name: "drill-depth", type: LaunchType.UserInitiated })}
+            />
+            <Action
+              title="Open Drill Example"
+              onAction={() =>
+                launchCommand({
+                  name: "drill-depth",
+                  type: LaunchType.UserInitiated,
+                  arguments: { prefill: EXAMPLES.drill },
                 })
               }
             />
