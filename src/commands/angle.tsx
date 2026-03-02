@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { calculateAngle } from "../lib/angles";
 import { AngleInput, AngleMode, AngleResult } from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
 
 type BeginnerTask = "corner" | "stairs" | "polygon" | "advanced";
 
@@ -255,11 +256,16 @@ export default function AngleCommand(props: LaunchProps<{ arguments: AngleArgs }
 
 function AngleResultView({ result, task }: { result: AngleResult; task: BeginnerTask }) {
   const instruction = buildInstruction(result, task);
+  const assumptions = result.assumptions?.length
+    ? ["**Assumptions**", ...result.assumptions.map((item) => `- ${item}`)].join("\n")
+    : "";
   const markdown = [
     result.summary,
     "",
     "**What to do next**",
     instruction,
+    "",
+    assumptions,
     "",
     `**Saw setting**: ${result.bladeSetting}`,
   ].join("\n\n");
@@ -280,6 +286,50 @@ function AngleResultView({ result, task }: { result: AngleResult; task: Beginner
           <Action.CopyToClipboard
             title="Copy Saw Setting"
             content={`Miter ${result.miterAngle.toFixed(2)}°, Bevel ${result.bevelAngle.toFixed(2)}°`}
+          />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Angle ${result.input.mode}`;
+              await saveJobRevision({
+                jobName,
+                type: "angle",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Cut List"
+            onAction={() =>
+              launchCommand({
+                name: "cutlist",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    pieces: [
+                      {
+                        length: 24,
+                        width: 3,
+                        quantity: 8,
+                        label: `${result.input.mode} frame segment`,
+                      },
+                    ],
+                    stock: {
+                      type: "board",
+                      length: 96,
+                      width: 3.5,
+                      unit: "inches",
+                    },
+                    kerf: 0.125,
+                    unit: "inches",
+                    allowRotation: true,
+                  }),
+                },
+              })
+            }
           />
         </ActionPanel>
       }

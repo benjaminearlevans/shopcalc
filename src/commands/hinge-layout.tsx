@@ -11,12 +11,23 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useMemo, useState } from "react";
+import { useCachedPromise } from "@raycast/utils";
+import { useEffect, useMemo, useState } from "react";
 import { calculateHingeLayout } from "../lib/hinge-layout";
 import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
-import { ExtensionPreferences, HingeLayoutInput, HingeLayoutResult, HingeMode, ToolContext, Unit } from "../types";
+import {
+  ExtensionPreferences,
+  HingeLayoutInput,
+  HingeLayoutResult,
+  HingeMode,
+  ToleranceMode,
+  ToolContext,
+  Unit,
+} from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
+import { getActiveProfile } from "../utils/profiles";
 
 interface HingeFormValues {
   doorHeight: string;
@@ -29,6 +40,7 @@ interface HingeFormValues {
   includeStlParams: "true" | "false";
   toolContext: ToolContext;
   detailMode: "basic" | "advanced";
+  toleranceMode: ToleranceMode;
 }
 
 type HingeArgs = {
@@ -39,6 +51,8 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
   const { push } = useNavigation();
   const prefs = getPreferenceValues<ExtensionPreferences>();
   const prefill = parsePrefill(props.arguments.prefill);
+  const hasPrefill = Boolean(props.arguments.prefill);
+  const { data: activeProfile } = useCachedPromise(getActiveProfile, [prefs]);
 
   const [doorHeight, setDoorHeight] = useState(prefill.doorHeight ?? "");
   const [topHingeOffset, setTopHingeOffset] = useState(prefill.topHingeOffset ?? "100");
@@ -50,6 +64,16 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
   const [includeStlParams, setIncludeStlParams] = useState<"true" | "false">(prefill.includeStlParams ?? "false");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
   const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
+  const [toleranceMode, setToleranceMode] = useState<ToleranceMode>(prefill.toleranceMode ?? "standard");
+
+  useEffect(() => {
+    if (!activeProfile || hasPrefill) {
+      return;
+    }
+    setUnit(activeProfile.unit);
+    setToolContext(activeProfile.toolContext);
+    setToleranceMode(activeProfile.toleranceMode);
+  }, [activeProfile, hasPrefill]);
 
   const preview = useMemo(() => {
     try {
@@ -64,6 +88,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
         includeStlParams,
         toolContext,
         detailMode,
+        toleranceMode,
       });
       if (!input) {
         return "Live preview: enter door height and hinge offsets.";
@@ -84,6 +109,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
     includeStlParams,
     toolContext,
     detailMode,
+    toleranceMode,
   ]);
 
   async function handleSubmit(values: HingeFormValues) {
@@ -115,6 +141,7 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
     setIncludeStlParams("true");
     setToolContext("drill");
     setDetailMode("advanced");
+    setToleranceMode("standard");
   }
 
   return (
@@ -215,6 +242,17 @@ export default function HingeLayoutCommand(props: LaunchProps<{ arguments: Hinge
             <Form.Dropdown.Item value="drill" title="Drill" />
             <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
           </Form.Dropdown>
+          <Form.Dropdown
+            id="toleranceMode"
+            title="Tolerance Mode"
+            value={toleranceMode}
+            onChange={(value) => setToleranceMode(value as ToleranceMode)}
+            info="Tight mode enforces stricter mirror symmetry."
+          >
+            <Form.Dropdown.Item value="tight" title="Tight" />
+            <Form.Dropdown.Item value="standard" title="Standard" />
+            <Form.Dropdown.Item value="loose" title="Loose" />
+          </Form.Dropdown>
         </>
       ) : null}
       <Form.Separator />
@@ -241,7 +279,8 @@ function HingeResultView({ result }: { result: HingeLayoutResult }) {
     `Bottom cup: (${result.cupCenterX.toFixed(3)}, ${result.bottomHoleY.toFixed(3)})`,
     "```",
   ].join("\n");
-  const parts = [result.summary, "", formatSafetyChecklist(result.input.toolContext)];
+  const assumptions = ["**Assumptions**", ...result.assumptions.map((item) => `- ${item}`)].join("\n");
+  const parts = [result.summary, "", assumptions, "", formatSafetyChecklist(result.input.toolContext)];
   parts.unshift(axisDiagram);
   parts.unshift("");
   parts.unshift(coordinateTable);
@@ -265,6 +304,7 @@ function HingeResultView({ result }: { result: HingeLayoutResult }) {
             text={`X ${result.cupCenterX.toFixed(3)}, Y ${result.bottomHoleY.toFixed(3)} ${result.input.unit}`}
           />
           <Detail.Metadata.Label title="Mirror-Safe" text={result.mirrorSafe ? "Yes" : "No"} />
+          <Detail.Metadata.Label title="Tolerance Mode" text={result.input.toleranceMode ?? "standard"} />
           <Detail.Metadata.TagList title="Warnings">
             <Detail.Metadata.TagList.Item text={warningStatus} color={result.warnings.length ? "#FF7A00" : "#0CA678"} />
           </Detail.Metadata.TagList>
@@ -279,6 +319,40 @@ function HingeResultView({ result }: { result: HingeLayoutResult }) {
           />
           <Action.CopyToClipboard title="Copy Template Reference" content={result.printableTemplateRef} />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Hinge ${result.input.doorHeight.toFixed(0)} ${result.input.unit}`;
+              await saveJobRevision({
+                jobName,
+                type: "hinge-layout",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Drill Depth"
+            onAction={() =>
+              launchCommand({
+                name: "drill-depth",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    desiredHoleDepth: result.input.cupDiameter * 0.45,
+                    materialThickness: result.input.cupDiameter,
+                    fastenerLength: result.input.cupDiameter * 0.6,
+                    screwType: "wood",
+                    unit: result.input.unit,
+                    toolContext: "drill",
+                    toleranceMode: result.input.toleranceMode ?? "standard",
+                  }),
+                },
+              })
+            }
+          />
         </ActionPanel>
       }
     />
@@ -306,6 +380,7 @@ function parseInput(values: Partial<HingeFormValues>): HingeLayoutInput | null {
     unit: (values.unit ?? "mm") as Unit,
     includeStlParams: (values.includeStlParams ?? "false") === "true",
     toolContext: (values.toolContext ?? "none") as ToolContext,
+    toleranceMode: (values.toleranceMode ?? "standard") as ToleranceMode,
   };
 }
 
@@ -326,6 +401,7 @@ function parsePrefill(raw?: string): Partial<HingeFormValues> {
       includeStlParams:
         parsed.includeStlParams !== undefined ? (String(parsed.includeStlParams) as "true" | "false") : undefined,
       toolContext: parsed.toolContext,
+      toleranceMode: parsed.toleranceMode,
     };
   } catch {
     return {};

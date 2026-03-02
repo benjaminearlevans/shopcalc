@@ -108,6 +108,45 @@
       ]
     },
     {
+      "name": "templates",
+      "title": "Template Library",
+      "subtitle": "ShopCalc",
+      "description": "Open reusable task templates for common fabrication workflows",
+      "mode": "view",
+      "keywords": [
+        "template",
+        "preset",
+        "starter",
+        "example"
+      ]
+    },
+    {
+      "name": "profiles",
+      "title": "Project Profiles",
+      "subtitle": "ShopCalc",
+      "description": "Create and manage profile defaults for units, kerf, tolerance, and safety context",
+      "mode": "view",
+      "keywords": [
+        "profile",
+        "defaults",
+        "preferences",
+        "tolerance"
+      ]
+    },
+    {
+      "name": "jobs",
+      "title": "Saved Jobs",
+      "subtitle": "ShopCalc",
+      "description": "Save result revisions and compare numeric changes across iterations",
+      "mode": "view",
+      "keywords": [
+        "job",
+        "saved",
+        "compare",
+        "revision"
+      ]
+    },
+    {
       "name": "spacing",
       "title": "Spacing Calculator",
       "subtitle": "ShopCalc",
@@ -391,7 +430,7 @@
     "eslint": "^9.22.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",
-    "vitest": "^2.1.9"
+    "vitest": "^4.0.18"
   },
   "scripts": {
     "build": "ray build",

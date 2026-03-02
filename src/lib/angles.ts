@@ -8,6 +8,7 @@ export function calculateAngle(input: AngleInput): AngleResult {
   let bevelAngle = 0;
   let summary = "";
   let bladeSetting = "";
+  const assumptions: string[] = [];
 
   switch (input.mode) {
     case "polygon": {
@@ -15,6 +16,7 @@ export function calculateAngle(input: AngleInput): AngleResult {
       miterAngle = 180 / sides;
       summary = `**${sides}-sided polygon**\n\nEach piece needs a **${round(miterAngle, 2)}°** miter.`;
       bladeSetting = `Set miter gauge to ${round(miterAngle, 2)}°`;
+      assumptions.push("Polygon joints assume equal side lengths and equal interior angles.");
       break;
     }
     case "stair-rail": {
@@ -26,6 +28,7 @@ export function calculateAngle(input: AngleInput): AngleResult {
         `**Complementary**: ${round(slope, 2)}°`,
       ].join("\n\n");
       bladeSetting = `Set miter gauge to ${round(miterAngle, 2)}°`;
+      assumptions.push("Rail profile is treated as a straight miter cut in plan.");
       break;
     }
     case "compound": {
@@ -41,12 +44,14 @@ export function calculateAngle(input: AngleInput): AngleResult {
         "\n\n",
       );
       bladeSetting = `Set miter to ${round(miterAngle, 2)}° and bevel to ${round(bevelAngle, 2)}°`;
+      assumptions.push("Compound formula assumes single-axis blade tilt and miter rotation.");
       break;
     }
     case "bevel": {
       bevelAngle = input.slopeAngle as number;
       summary = `**Bevel cut**\n\nTilt blade to **${round(bevelAngle, 2)}°**.`;
       bladeSetting = `Tilt blade to ${round(bevelAngle, 2)}°`;
+      assumptions.push("Bevel mode assumes miter angle remains 0°.");
       break;
     }
     case "miter":
@@ -58,6 +63,7 @@ export function calculateAngle(input: AngleInput): AngleResult {
         `Each piece gets **${round(miterAngle, 2)}°** miter`,
       ].join("\n\n");
       bladeSetting = `Set miter gauge to ${round(miterAngle, 2)}°`;
+      assumptions.push("Miter mode assumes equal split of joint angle across both pieces.");
       break;
     }
   }
@@ -67,6 +73,7 @@ export function calculateAngle(input: AngleInput): AngleResult {
     miterAngle: round(miterAngle, 2),
     bevelAngle: round(bevelAngle, 2),
     complementary: round(90 - miterAngle, 2),
+    assumptions,
     summary,
     bladeSetting,
   };

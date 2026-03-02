@@ -11,12 +11,22 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useMemo, useState } from "react";
+import { useCachedPromise } from "@raycast/utils";
+import { useEffect, useMemo, useState } from "react";
 import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
 import { calculateScribePlan } from "../lib/scribe-planner";
-import { ExtensionPreferences, ScribePlannerInput, ScribePlannerResult, ToolContext, Unit } from "../types";
+import {
+  ExtensionPreferences,
+  ScribePlannerInput,
+  ScribePlannerResult,
+  ToleranceMode,
+  ToolContext,
+  Unit,
+} from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
+import { getActiveProfile } from "../utils/profiles";
 
 interface ScribeFormValues {
   nominalWallWidth: string;
@@ -27,6 +37,7 @@ interface ScribeFormValues {
   unit: Unit;
   toolContext: ToolContext;
   detailMode: "basic" | "advanced";
+  toleranceMode: ToleranceMode;
 }
 
 type ScribeArgs = {
@@ -37,6 +48,8 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
   const { push } = useNavigation();
   const prefs = getPreferenceValues<ExtensionPreferences>();
   const prefill = parsePrefill(props.arguments.prefill);
+  const hasPrefill = Boolean(props.arguments.prefill);
+  const { data: activeProfile } = useCachedPromise(getActiveProfile, [prefs]);
 
   const [nominalWallWidth, setNominalWallWidth] = useState(prefill.nominalWallWidth ?? "");
   const [highDeviation, setHighDeviation] = useState(prefill.highDeviation ?? "0");
@@ -46,6 +59,16 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
   const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
+  const [toleranceMode, setToleranceMode] = useState<ToleranceMode>(prefill.toleranceMode ?? "standard");
+
+  useEffect(() => {
+    if (!activeProfile || hasPrefill) {
+      return;
+    }
+    setUnit(activeProfile.unit);
+    setToolContext(activeProfile.toolContext);
+    setToleranceMode(activeProfile.toleranceMode);
+  }, [activeProfile, hasPrefill]);
 
   const preview = useMemo(() => {
     try {
@@ -58,6 +81,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
         unit,
         toolContext,
         detailMode,
+        toleranceMode,
       });
       if (!input) {
         return "Live preview: enter nominal width and target visible width.";
@@ -67,7 +91,16 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
     } catch (error) {
       return `Live preview: ${error instanceof Error ? error.message : "invalid input"}`;
     }
-  }, [nominalWallWidth, highDeviation, lowDeviation, plumbDeviation, desiredVisibleWidth, unit, toolContext]);
+  }, [
+    nominalWallWidth,
+    highDeviation,
+    lowDeviation,
+    plumbDeviation,
+    desiredVisibleWidth,
+    unit,
+    toolContext,
+    toleranceMode,
+  ]);
 
   async function handleSubmit(values: ScribeFormValues) {
     try {
@@ -96,6 +129,7 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
     setUnit("inches");
     setToolContext("router");
     setDetailMode("advanced");
+    setToleranceMode("standard");
   }
 
   return (
@@ -168,19 +202,32 @@ export default function ScribePlannerCommand(props: LaunchProps<{ arguments: Scr
         <Form.Dropdown.Item value="cm" title="Centimeters" />
       </Form.Dropdown>
       {detailMode === "advanced" ? (
-        <Form.Dropdown
-          id="toolContext"
-          title="Safety Tool Context"
-          value={toolContext}
-          onChange={(value) => setToolContext(value as ToolContext)}
-          info="Shows force-vector safety checklist in the output."
-        >
-          <Form.Dropdown.Item value="none" title="None" />
-          <Form.Dropdown.Item value="router" title="Router" />
-          <Form.Dropdown.Item value="table-saw" title="Table Saw" />
-          <Form.Dropdown.Item value="drill" title="Drill" />
-          <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
-        </Form.Dropdown>
+        <>
+          <Form.Dropdown
+            id="toolContext"
+            title="Safety Tool Context"
+            value={toolContext}
+            onChange={(value) => setToolContext(value as ToolContext)}
+            info="Shows force-vector safety checklist in the output."
+          >
+            <Form.Dropdown.Item value="none" title="None" />
+            <Form.Dropdown.Item value="router" title="Router" />
+            <Form.Dropdown.Item value="table-saw" title="Table Saw" />
+            <Form.Dropdown.Item value="drill" title="Drill" />
+            <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
+          </Form.Dropdown>
+          <Form.Dropdown
+            id="toleranceMode"
+            title="Tolerance Mode"
+            value={toleranceMode}
+            onChange={(value) => setToleranceMode(value as ToleranceMode)}
+            info="Tight mode adds more oversize margin before final scribe."
+          >
+            <Form.Dropdown.Item value="tight" title="Tight" />
+            <Form.Dropdown.Item value="standard" title="Standard" />
+            <Form.Dropdown.Item value="loose" title="Loose" />
+          </Form.Dropdown>
+        </>
       ) : null}
       <Form.Separator />
       <Form.Description text={preview} />
@@ -203,6 +250,9 @@ function ScribeResultView({ result }: { result: ScribePlannerResult }) {
     "**Deviation Table**",
     deviationTable,
     "",
+    "**Assumptions**",
+    ...result.assumptions.map((item) => `- ${item}`),
+    "",
     formatSafetyChecklist(result.input.toolContext),
   ].join("\n\n");
   return (
@@ -222,6 +272,7 @@ function ScribeResultView({ result }: { result: ScribePlannerResult }) {
             title="Max Scribe Allowance"
             text={`${result.maximumScribeAllowance.toFixed(3)} ${result.input.unit}`}
           />
+          <Detail.Metadata.Label title="Tolerance Mode" text={result.input.toleranceMode ?? "standard"} />
           <Detail.Metadata.TagList title="Warnings">
             <Detail.Metadata.TagList.Item text={warningStatus} color={result.warnings.length ? "#FF7A00" : "#0CA678"} />
           </Detail.Metadata.TagList>
@@ -235,6 +286,51 @@ function ScribeResultView({ result }: { result: ScribePlannerResult }) {
             content={`Rough cut: ${result.roughCutDimension.toFixed(3)} ${result.input.unit}\nOversize: ${result.oversizeMargin.toFixed(3)} ${result.input.unit}\nMax scribe: ${result.maximumScribeAllowance.toFixed(3)} ${result.input.unit}`}
           />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Scribe ${result.input.desiredVisibleWidth.toFixed(2)} ${result.input.unit}`;
+              await saveJobRevision({
+                jobName,
+                type: "scribe-planner",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Cut List"
+            onAction={() =>
+              launchCommand({
+                name: "cutlist",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    pieces: [
+                      {
+                        length: result.roughCutDimension,
+                        width: result.input.nominalWallWidth,
+                        quantity: 1,
+                        label: "Scribe Blank",
+                      },
+                    ],
+                    stock: {
+                      type: "sheet",
+                      length: result.roughCutDimension + result.oversizeMargin,
+                      width: result.input.nominalWallWidth + result.oversizeMargin,
+                      unit: result.input.unit,
+                    },
+                    kerf: result.input.unit === "inches" ? 0.125 : result.input.unit === "mm" ? 3.2 : 0.32,
+                    unit: result.input.unit,
+                    allowRotation: true,
+                    toleranceMode: result.input.toleranceMode ?? "standard",
+                  }),
+                },
+              })
+            }
+          />
         </ActionPanel>
       }
     />
@@ -257,6 +353,7 @@ function parseInput(values: Partial<ScribeFormValues>): ScribePlannerInput | nul
     ),
     unit: (values.unit ?? "inches") as Unit,
     toolContext: (values.toolContext ?? "none") as ToolContext,
+    toleranceMode: (values.toleranceMode ?? "standard") as ToleranceMode,
   };
 }
 
@@ -274,6 +371,7 @@ function parsePrefill(raw?: string): Partial<ScribeFormValues> {
       desiredVisibleWidth: parsed.desiredVisibleWidth !== undefined ? String(parsed.desiredVisibleWidth) : undefined,
       unit: parsed.unit,
       toolContext: parsed.toolContext,
+      toleranceMode: parsed.toleranceMode,
     };
   } catch {
     return {};

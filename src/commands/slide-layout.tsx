@@ -11,12 +11,15 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useMemo, useState } from "react";
+import { useCachedPromise } from "@raycast/utils";
+import { useEffect, useMemo, useState } from "react";
 import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
 import { calculateSlideLayout } from "../lib/slide-layout";
-import { ExtensionPreferences, SlideLayoutInput, SlideLayoutResult, ToolContext, Unit } from "../types";
+import { ExtensionPreferences, SlideLayoutInput, SlideLayoutResult, ToleranceMode, ToolContext, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
+import { getActiveProfile } from "../utils/profiles";
 
 interface SlideFormValues {
   cabinetInteriorHeight: string;
@@ -27,6 +30,7 @@ interface SlideFormValues {
   unit: Unit;
   toolContext: ToolContext;
   detailMode: "basic" | "advanced";
+  toleranceMode: ToleranceMode;
 }
 
 type SlideArgs = {
@@ -37,6 +41,8 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
   const { push } = useNavigation();
   const prefs = getPreferenceValues<ExtensionPreferences>();
   const prefill = parsePrefill(props.arguments.prefill);
+  const hasPrefill = Boolean(props.arguments.prefill);
+  const { data: activeProfile } = useCachedPromise(getActiveProfile, [prefs]);
 
   const [cabinetInteriorHeight, setCabinetInteriorHeight] = useState(prefill.cabinetInteriorHeight ?? "");
   const [drawerCount, setDrawerCount] = useState(prefill.drawerCount ?? "4");
@@ -46,6 +52,16 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
   const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
+  const [toleranceMode, setToleranceMode] = useState<ToleranceMode>(prefill.toleranceMode ?? "standard");
+
+  useEffect(() => {
+    if (!activeProfile || hasPrefill) {
+      return;
+    }
+    setUnit(activeProfile.unit);
+    setToolContext(activeProfile.toolContext);
+    setToleranceMode(activeProfile.toleranceMode);
+  }, [activeProfile, hasPrefill]);
 
   const preview = useMemo(() => {
     try {
@@ -58,6 +74,7 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
         unit,
         toolContext,
         detailMode,
+        toleranceMode,
       });
       if (!input) {
         return "Live preview: enter cabinet height and drawer count.";
@@ -67,7 +84,7 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
     } catch (error) {
       return `Live preview: ${error instanceof Error ? error.message : "invalid input"}`;
     }
-  }, [cabinetInteriorHeight, drawerCount, topMargin, gapSpacing, slideThickness, unit, toolContext]);
+  }, [cabinetInteriorHeight, drawerCount, topMargin, gapSpacing, slideThickness, unit, toolContext, toleranceMode]);
 
   async function handleSubmit(values: SlideFormValues) {
     try {
@@ -96,6 +113,7 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
     setUnit("inches");
     setToolContext("table-saw");
     setDetailMode("advanced");
+    setToleranceMode("standard");
   }
 
   return (
@@ -168,19 +186,32 @@ export default function SlideLayoutCommand(props: LaunchProps<{ arguments: Slide
         <Form.Dropdown.Item value="cm" title="Centimeters" />
       </Form.Dropdown>
       {detailMode === "advanced" ? (
-        <Form.Dropdown
-          id="toolContext"
-          title="Safety Tool Context"
-          value={toolContext}
-          onChange={(value) => setToolContext(value as ToolContext)}
-          info="Shows force-vector safety checklist in the output."
-        >
-          <Form.Dropdown.Item value="none" title="None" />
-          <Form.Dropdown.Item value="router" title="Router" />
-          <Form.Dropdown.Item value="table-saw" title="Table Saw" />
-          <Form.Dropdown.Item value="drill" title="Drill" />
-          <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
-        </Form.Dropdown>
+        <>
+          <Form.Dropdown
+            id="toolContext"
+            title="Safety Tool Context"
+            value={toolContext}
+            onChange={(value) => setToolContext(value as ToolContext)}
+            info="Shows force-vector safety checklist in the output."
+          >
+            <Form.Dropdown.Item value="none" title="None" />
+            <Form.Dropdown.Item value="router" title="Router" />
+            <Form.Dropdown.Item value="table-saw" title="Table Saw" />
+            <Form.Dropdown.Item value="drill" title="Drill" />
+            <Form.Dropdown.Item value="pocket-screw" title="Pocket Screw" />
+          </Form.Dropdown>
+          <Form.Dropdown
+            id="toleranceMode"
+            title="Tolerance Mode"
+            value={toleranceMode}
+            onChange={(value) => setToleranceMode(value as ToleranceMode)}
+            info="Tight mode expects additional headroom per slide stack."
+          >
+            <Form.Dropdown.Item value="tight" title="Tight" />
+            <Form.Dropdown.Item value="standard" title="Standard" />
+            <Form.Dropdown.Item value="loose" title="Loose" />
+          </Form.Dropdown>
+        </>
       ) : null}
       <Form.Separator />
       <Form.Description text={preview} />
@@ -197,9 +228,17 @@ function SlideResultView({ result }: { result: SlideLayoutResult }) {
         `| ${row.drawerIndex} | ${row.topY.toFixed(3)} ${result.input.unit} | ${row.centerY.toFixed(3)} ${result.input.unit} | ${row.bottomY.toFixed(3)} ${result.input.unit} |`,
     ),
   ].join("\n");
-  const markdown = [result.summary, "", result.diagram, "", formatSafetyChecklist(result.input.toolContext)].join(
-    "\n\n",
-  );
+  const assumptions = ["**Assumptions**", ...result.assumptions.map((item) => `- ${item}`)].join("\n");
+  const warningStatus = result.warnings.length ? `Caution (${result.warnings.length})` : "Clear";
+  const markdown = [
+    result.summary,
+    "",
+    assumptions,
+    "",
+    result.diagram,
+    "",
+    formatSafetyChecklist(result.input.toolContext),
+  ].join("\n\n");
   return (
     <Detail
       markdown={[markdown, "", "**Coordinate Table**", coordinateTable].join("\n\n")}
@@ -214,8 +253,9 @@ function SlideResultView({ result }: { result: SlideLayoutResult }) {
             title="Baseline Offset"
             text={`${result.laserBaselineOffset.toFixed(3)} ${result.input.unit}`}
           />
+          <Detail.Metadata.Label title="Tolerance Mode" text={result.input.toleranceMode ?? "standard"} />
           <Detail.Metadata.TagList title="Warnings">
-            <Detail.Metadata.TagList.Item text="None" color="#0CA678" />
+            <Detail.Metadata.TagList.Item text={warningStatus} color={result.warnings.length ? "#FF7A00" : "#0CA678"} />
           </Detail.Metadata.TagList>
         </Detail.Metadata>
       }
@@ -236,6 +276,40 @@ function SlideResultView({ result }: { result: SlideLayoutResult }) {
             content={`${result.spacerBlockHeight.toFixed(3)} ${result.input.unit}`}
           />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Slide Stack ${result.input.drawerCount} drawers`;
+              await saveJobRevision({
+                jobName,
+                type: "slide-layout",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Spacing Calculator"
+            onAction={() =>
+              launchCommand({
+                name: "spacing",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    totalLength: result.input.cabinetInteriorHeight,
+                    count: result.input.drawerCount,
+                    elementWidth: result.input.slideThickness,
+                    unit: result.input.unit,
+                    edgeOffset: result.input.topMargin,
+                    centerToCenter: false,
+                    toleranceMode: result.input.toleranceMode ?? "standard",
+                  }),
+                },
+              })
+            }
+          />
         </ActionPanel>
       }
     />
@@ -264,6 +338,7 @@ function parseInput(values: Partial<SlideFormValues>): SlideLayoutInput | null {
     slideThickness: parseMeasurementInput(values.slideThickness, values.unit ?? "inches", "slide thickness"),
     unit: (values.unit ?? "inches") as Unit,
     toolContext: (values.toolContext ?? "none") as ToolContext,
+    toleranceMode: (values.toleranceMode ?? "standard") as ToleranceMode,
   };
 }
 
@@ -282,6 +357,7 @@ function parsePrefill(raw?: string): Partial<SlideFormValues> {
       slideThickness: parsed.slideThickness !== undefined ? String(parsed.slideThickness) : undefined,
       unit: parsed.unit,
       toolContext: parsed.toolContext,
+      toleranceMode: parsed.toleranceMode,
     };
   } catch {
     return {};

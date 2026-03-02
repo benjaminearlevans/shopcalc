@@ -3,6 +3,7 @@ import { formatNumber, unitLabel } from "../utils/format";
 
 export function calculateDrawerBox(input: DrawerBoxInput): DrawerBoxResult {
   validateDrawerInput(input);
+  const toleranceMode = input.toleranceMode ?? "standard";
 
   const clearOpeningWidth = input.openingWidth - input.slideClearance * 2;
   const frontBackPanelLength = clearOpeningWidth - input.materialThickness * 2;
@@ -14,7 +15,8 @@ export function calculateDrawerBox(input: DrawerBoxInput): DrawerBoxResult {
   const rabbetDepth = Math.min(input.materialThickness * 0.5, input.bottomThickness + input.bottomInsetDepth * 0.2);
   const rabbetWidth = input.bottomInsetDepth;
 
-  const requiredSlideSpacing = input.slideType === "side-mount" ? input.slideClearance : input.slideClearance * 0.5;
+  const spacingBase = input.slideType === "side-mount" ? input.slideClearance : input.slideClearance * 0.5;
+  const requiredSlideSpacing = spacingBase + toleranceOffset(input.unit, toleranceMode);
 
   const warnings: string[] = [];
   if (clearOpeningWidth <= 0) {
@@ -26,10 +28,21 @@ export function calculateDrawerBox(input: DrawerBoxInput): DrawerBoxResult {
   if (input.slideType === "undermount" && input.slideClearance > input.materialThickness) {
     warnings.push("Undermount clearance is larger than material thickness. Re-check slide spec.");
   }
+  if (toleranceMode === "tight") {
+    warnings.push("Tight tolerance selected. Dry-fit one drawer before batch cutting.");
+  }
+
+  const assumptions = [
+    `Tolerance mode: ${toleranceMode}`,
+    "Clear opening subtracts two side clearances and two side panel thicknesses.",
+    "Bottom panel is inset equally on width and depth.",
+    "Rabbet depth uses a conservative half-thickness cap.",
+  ];
 
   const unit = unitLabel(input.unit);
   const summary = [
     `**Drawer Box (${input.slideType}, ${input.joineryType})**`,
+    `Tolerance mode: **${toleranceMode}**`,
     `Side panel length: **${formatNumber(sidePanelLength, 3)} ${unit}**`,
     `Front/back panel length: **${formatNumber(frontBackPanelLength, 3)} ${unit}**`,
     `Bottom panel: **${formatNumber(bottomPanelWidth, 3)} x ${formatNumber(bottomPanelLength, 3)} ${unit}**`,
@@ -64,6 +77,7 @@ export function calculateDrawerBox(input: DrawerBoxInput): DrawerBoxResult {
     rabbetWidth,
     requiredSlideSpacing,
     warnings,
+    assumptions,
     diagram,
     summary,
   };
@@ -84,4 +98,13 @@ function validateDrawerInput(input: DrawerBoxInput): void {
       throw new Error(`${label} must be a positive number`);
     }
   }
+}
+
+function toleranceOffset(unit: DrawerBoxInput["unit"], mode: NonNullable<DrawerBoxInput["toleranceMode"]>): number {
+  if (mode === "standard") {
+    return 0;
+  }
+
+  const base = unit === "mm" ? 0.2 : unit === "cm" ? 0.02 : 0.008;
+  return mode === "tight" ? -base : base;
 }

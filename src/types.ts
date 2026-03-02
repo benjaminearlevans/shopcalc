@@ -1,6 +1,7 @@
 export type Unit = "inches" | "mm" | "cm";
 export type FractionPrecision = 8 | 16 | 32 | 64;
 export type ToolContext = "none" | "router" | "table-saw" | "drill" | "pocket-screw";
+export type ToleranceMode = "tight" | "standard" | "loose";
 
 export interface FractionalInch {
   decimal: number;
@@ -18,6 +19,7 @@ export interface SpacingInput {
   unit: Unit;
   edgeOffset?: number;
   centerToCenter?: boolean;
+  toleranceMode?: ToleranceMode;
 }
 
 export interface SpacingResult {
@@ -28,6 +30,7 @@ export interface SpacingResult {
   remainingSpace: number;
   repeatingUnit: number;
   diagram: string;
+  assumptions?: string[];
   summary: string;
 }
 
@@ -44,6 +47,7 @@ export interface ConversionResult {
   mm: number;
   cm: number;
   fractional: FractionalInch;
+  assumptions?: string[];
   summary: string;
 }
 
@@ -73,6 +77,7 @@ export interface CutListInput {
   kerf: number;
   unit: Unit;
   allowRotation?: boolean;
+  toleranceMode?: ToleranceMode;
 }
 
 export interface BoardLayout {
@@ -101,6 +106,7 @@ export interface CutListResult {
   layout: string;
   boardLayouts?: BoardLayout[];
   sheetPlacements?: SheetPlacement[];
+  assumptions?: string[];
   summary: string;
 }
 
@@ -121,6 +127,7 @@ export interface AngleResult {
   miterAngle: number;
   bevelAngle: number;
   complementary: number;
+  assumptions?: string[];
   summary: string;
   bladeSetting: string;
 }
@@ -139,6 +146,7 @@ export interface DrawerBoxInput {
   bottomThickness: number;
   unit: Unit;
   toolContext?: ToolContext;
+  toleranceMode?: ToleranceMode;
 }
 
 export interface DrawerBoxResult {
@@ -151,6 +159,7 @@ export interface DrawerBoxResult {
   rabbetWidth: number;
   requiredSlideSpacing: number;
   warnings: string[];
+  assumptions: string[];
   diagram: string;
   summary: string;
 }
@@ -167,6 +176,7 @@ export interface HingeLayoutInput {
   unit: Unit;
   includeStlParams?: boolean;
   toolContext?: ToolContext;
+  toleranceMode?: ToleranceMode;
 }
 
 export interface HingeLayoutResult {
@@ -178,6 +188,7 @@ export interface HingeLayoutResult {
   printableTemplateRef: string;
   stlParams?: string;
   warnings: string[];
+  assumptions: string[];
   summary: string;
 }
 
@@ -189,6 +200,7 @@ export interface SlideLayoutInput {
   slideThickness: number;
   unit: Unit;
   toolContext?: ToolContext;
+  toleranceMode?: ToleranceMode;
 }
 
 export interface SlideCoordinate {
@@ -204,6 +216,8 @@ export interface SlideLayoutResult {
   spacerBlockHeight: number;
   laserBaselineOffset: number;
   diagram: string;
+  warnings: string[];
+  assumptions: string[];
   summary: string;
 }
 
@@ -215,6 +229,7 @@ export interface ScribePlannerInput {
   desiredVisibleWidth: number;
   unit: Unit;
   toolContext?: ToolContext;
+  toleranceMode?: ToleranceMode;
 }
 
 export interface ScribePlannerResult {
@@ -224,6 +239,7 @@ export interface ScribePlannerResult {
   maximumScribeAllowance: number;
   exceedsShimTolerance: boolean;
   warnings: string[];
+  assumptions: string[];
   summary: string;
 }
 
@@ -237,6 +253,7 @@ export interface DrillDepthInput {
   screwDiameter?: number;
   unit: Unit;
   toolContext?: ToolContext;
+  toleranceMode?: ToleranceMode;
 }
 
 export interface DrillDepthResult {
@@ -246,6 +263,7 @@ export interface DrillDepthResult {
   throughHoleRisk: boolean;
   pilotHoleDiameter?: number;
   warnings: string[];
+  assumptions: string[];
   summary: string;
 }
 
@@ -283,4 +301,32 @@ export interface ExtensionPreferences {
   defaultUnit?: Unit;
   fractionPrecision?: string;
   kerfWidth?: string;
+}
+
+export interface ProjectProfile {
+  id: string;
+  name: string;
+  description?: string;
+  unit: Unit;
+  fractionPrecision: FractionPrecision;
+  kerfWidth: number;
+  toleranceMode: ToleranceMode;
+  toolContext: ToolContext;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SavedJobRevision {
+  id: string;
+  jobName: string;
+  type: CalculationType;
+  timestamp: number;
+  summary: string;
+  input: HistoryEntry["input"];
+  output: unknown;
+}
+
+export interface SavedJob {
+  jobName: string;
+  revisions: SavedJobRevision[];
 }

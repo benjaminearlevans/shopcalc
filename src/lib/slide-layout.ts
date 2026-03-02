@@ -3,6 +3,7 @@ import { formatNumber, unitLabel } from "../utils/format";
 
 export function calculateSlideLayout(input: SlideLayoutInput): SlideLayoutResult {
   validateInput(input);
+  const toleranceMode = input.toleranceMode ?? "standard";
 
   const stackHeight = input.drawerCount * input.slideThickness + (input.drawerCount - 1) * input.gapSpacing;
   const availableHeight = input.cabinetInteriorHeight - input.topMargin;
@@ -20,11 +21,28 @@ export function calculateSlideLayout(input: SlideLayoutInput): SlideLayoutResult
 
   const spacerBlockHeight = input.slideThickness + input.gapSpacing;
   const laserBaselineOffset = input.topMargin;
+  const headroom = availableHeight - stackHeight;
+  const warnings: string[] = [];
+  const targetHeadroom = preferredHeadroom(input.unit, toleranceMode);
+  if (headroom < targetHeadroom) {
+    warnings.push(
+      `Headroom is ${formatNumber(headroom, 3)} ${unitLabel(input.unit)}, below ${formatNumber(targetHeadroom, 3)} ${unitLabel(input.unit)} target for ${toleranceMode} mode.`,
+    );
+  }
+
+  const assumptions = [
+    `Tolerance mode: ${toleranceMode}`,
+    "Top baseline is measured from cabinet top to first slide top edge.",
+    "Each drawer level advances by slide thickness + gap spacing.",
+    "Coordinates are vertical references for left/right slide pair.",
+  ];
 
   const summary = [
     "**Slide Layout**",
+    `Tolerance mode: **${toleranceMode}**`,
     `Top baseline offset: **${formatNumber(laserBaselineOffset, 3)} ${unitLabel(input.unit)}**`,
     `Spacer block height: **${formatNumber(spacerBlockHeight, 3)} ${unitLabel(input.unit)}**`,
+    `Remaining headroom: **${formatNumber(headroom, 3)} ${unitLabel(input.unit)}**`,
     "",
     ...coordinates.map(
       (coordinate) =>
@@ -54,6 +72,8 @@ export function calculateSlideLayout(input: SlideLayoutInput): SlideLayoutResult
     spacerBlockHeight,
     laserBaselineOffset,
     diagram,
+    warnings,
+    assumptions,
     summary,
   };
 }
@@ -73,4 +93,18 @@ function validateInput(input: SlideLayoutInput): void {
   if (!Number.isInteger(input.drawerCount) || input.drawerCount <= 0) {
     throw new Error("Drawer count must be a whole number greater than zero");
   }
+}
+
+function preferredHeadroom(
+  unit: SlideLayoutInput["unit"],
+  mode: NonNullable<SlideLayoutInput["toleranceMode"]>,
+): number {
+  const base = unit === "mm" ? 2 : unit === "cm" ? 0.2 : 1 / 16;
+  if (mode === "tight") {
+    return base * 2;
+  }
+  if (mode === "loose") {
+    return base * 0.5;
+  }
+  return base;
 }

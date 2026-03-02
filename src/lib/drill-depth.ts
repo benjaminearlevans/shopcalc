@@ -10,8 +10,9 @@ const PILOT_FACTORS: Record<Exclude<ScrewType, "custom">, number> = {
 
 export function calculateDrillDepth(input: DrillDepthInput): DrillDepthResult {
   validateInput(input);
+  const toleranceMode = input.toleranceMode ?? "standard";
 
-  const safetyMargin = safetyMarginByUnit(input.unit);
+  const safetyMargin = safetyMarginByUnit(input.unit, toleranceMode);
   const stopCollarSetting = input.desiredHoleDepth;
   const minimumSafeDepth = Math.min(
     input.materialThickness - safetyMargin,
@@ -31,9 +32,20 @@ export function calculateDrillDepth(input: DrillDepthInput): DrillDepthResult {
   if (minimumSafeDepth <= safetyMargin) {
     warnings.push("Material is too thin for this fastener/depth combination.");
   }
+  if (toleranceMode === "tight") {
+    warnings.push("Tight tolerance mode assumes frequent collar verification between holes.");
+  }
+
+  const assumptions = [
+    `Tolerance mode: ${toleranceMode}`,
+    "Stop collar setting equals requested drilling depth.",
+    "Safety margin is unit/tolerance dependent for blowout protection.",
+    "Pilot hole factors are rule-of-thumb by screw type.",
+  ];
 
   const summary = [
     "**Drill Depth & Stop Control**",
+    `Tolerance mode: **${toleranceMode}**`,
     `Stop collar setting: **${formatNumber(stopCollarSetting, 3)} ${unitLabel(input.unit)}**`,
     `Minimum safe drilling depth: **${formatNumber(minimumSafeDepth, 3)} ${unitLabel(input.unit)}**`,
     `Through-hole risk: **${throughHoleRisk ? "Yes" : "No"}**`,
@@ -50,6 +62,7 @@ export function calculateDrillDepth(input: DrillDepthInput): DrillDepthResult {
     throughHoleRisk,
     pilotHoleDiameter,
     warnings,
+    assumptions,
     summary,
   };
 }
@@ -82,12 +95,16 @@ function suggestPilotDiameter(input: DrillDepthInput): number | undefined {
   return input.screwDiameter * PILOT_FACTORS[input.screwType];
 }
 
-function safetyMarginByUnit(unit: DrillDepthInput["unit"]): number {
-  if (unit === "mm") {
-    return 1.5;
+function safetyMarginByUnit(
+  unit: DrillDepthInput["unit"],
+  mode: NonNullable<DrillDepthInput["toleranceMode"]>,
+): number {
+  const base = unit === "mm" ? 1.5 : unit === "cm" ? 0.15 : 1 / 16;
+  if (mode === "tight") {
+    return base * 1.25;
   }
-  if (unit === "cm") {
-    return 0.15;
+  if (mode === "loose") {
+    return base * 0.85;
   }
-  return 1 / 16;
+  return base;
 }

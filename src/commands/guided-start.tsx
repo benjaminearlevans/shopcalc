@@ -90,6 +90,50 @@ const EXAMPLES = {
 export default function GuidedStartCommand() {
   return (
     <List searchBarPlaceholder="What are you trying to do?">
+      <List.Section title="Workspace">
+        <List.Item
+          icon={{ source: Icon.List, tintColor: Color.Green }}
+          title="Start from a template"
+          subtitle="Use prefilled workflows for common jobs"
+          accessories={[{ text: "Template Library" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Template Library"
+                onAction={() => launchCommand({ name: "templates", type: LaunchType.UserInitiated })}
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          icon={{ source: Icon.Person, tintColor: Color.Orange }}
+          title="Set project profile defaults"
+          subtitle="Units, kerf, tolerance, safety context"
+          accessories={[{ text: "Project Profiles" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Project Profiles"
+                onAction={() => launchCommand({ name: "profiles", type: LaunchType.UserInitiated })}
+              />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          icon={{ source: Icon.Box, tintColor: Color.Purple }}
+          title="Review and compare saved jobs"
+          subtitle="Track revisions and numeric deltas"
+          accessories={[{ text: "Saved Jobs" }]}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Open Saved Jobs"
+                onAction={() => launchCommand({ name: "jobs", type: LaunchType.UserInitiated })}
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
       <List.Section title="Layout">
         <List.Item
           icon={{ source: Icon.Ruler, tintColor: Color.Blue }}

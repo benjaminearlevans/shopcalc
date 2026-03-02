@@ -11,11 +11,14 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useMemo, useState } from "react";
+import { useCachedPromise } from "@raycast/utils";
+import { useEffect, useMemo, useState } from "react";
 import { parseMeasurementInput } from "../lib/measurements";
 import { calculateSpacing } from "../lib/spacing";
-import { ExtensionPreferences, SpacingInput, SpacingResult, Unit } from "../types";
+import { ExtensionPreferences, SpacingInput, SpacingResult, ToleranceMode, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
+import { getActiveProfile } from "../utils/profiles";
 
 interface SpacingFormValues {
   totalLength: string;
@@ -24,6 +27,7 @@ interface SpacingFormValues {
   unit: Unit;
   edgeOffset: string;
   centerToCenter: "false" | "true";
+  toleranceMode: ToleranceMode;
 }
 
 type SpacingArgs = {
@@ -37,12 +41,15 @@ type SpacingPrefill = {
   unit?: Unit;
   edgeOffset?: string;
   centerToCenter?: "false" | "true";
+  toleranceMode?: ToleranceMode;
 };
 
 export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingArgs }>) {
   const { push } = useNavigation();
   const prefs = getPreferenceValues<ExtensionPreferences>();
   const prefill = parseSpacingPrefill(props.arguments.prefill);
+  const hasPrefill = Boolean(props.arguments.prefill);
+  const { data: activeProfile } = useCachedPromise(getActiveProfile, [prefs]);
 
   const [totalLength, setTotalLength] = useState(prefill.totalLength ?? "");
   const [count, setCount] = useState(prefill.count ?? "");
@@ -50,6 +57,15 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches");
   const [edgeOffset, setEdgeOffset] = useState(prefill.edgeOffset ?? "0");
   const [centerToCenter, setCenterToCenter] = useState<"false" | "true">(prefill.centerToCenter ?? "false");
+  const [toleranceMode, setToleranceMode] = useState<ToleranceMode>(prefill.toleranceMode ?? "standard");
+
+  useEffect(() => {
+    if (!activeProfile || hasPrefill) {
+      return;
+    }
+    setUnit(activeProfile.unit);
+    setToleranceMode(activeProfile.toleranceMode);
+  }, [activeProfile, hasPrefill]);
 
   const preview = useMemo(() => {
     const input = buildSpacingInput({
@@ -59,6 +75,7 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
       unit,
       edgeOffset,
       centerToCenter,
+      toleranceMode,
     });
 
     if (!input) {
@@ -71,7 +88,7 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
     } catch (error) {
       return `Live preview: ${error instanceof Error ? error.message : "invalid input"}`;
     }
-  }, [totalLength, count, elementWidth, unit, edgeOffset, centerToCenter]);
+  }, [totalLength, count, elementWidth, unit, edgeOffset, centerToCenter, toleranceMode]);
 
   async function handleSubmit(values: SpacingFormValues) {
     try {
@@ -99,6 +116,7 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
     setUnit("inches");
     setEdgeOffset("2.5");
     setCenterToCenter("false");
+    setToleranceMode("standard");
   }
 
   return (
@@ -162,6 +180,16 @@ export default function SpacingCommand(props: LaunchProps<{ arguments: SpacingAr
         <Form.Dropdown.Item value="false" title="Gap between piece edges (recommended)" />
         <Form.Dropdown.Item value="true" title="Distance between piece centers" />
       </Form.Dropdown>
+      <Form.Dropdown
+        id="toleranceMode"
+        title="Tolerance Mode"
+        value={toleranceMode}
+        onChange={(value) => setToleranceMode(value as ToleranceMode)}
+      >
+        <Form.Dropdown.Item value="tight" title="Tight" />
+        <Form.Dropdown.Item value="standard" title="Standard" />
+        <Form.Dropdown.Item value="loose" title="Loose" />
+      </Form.Dropdown>
       <Form.Separator />
       <Form.Description text={preview} />
     </Form>
@@ -180,6 +208,7 @@ function buildSpacingInput(values: SpacingFormValues): SpacingInput | null {
     unit: values.unit,
     edgeOffset: values.edgeOffset ? parseMeasurementInput(values.edgeOffset, values.unit, "edge offset") : 0,
     centerToCenter: values.centerToCenter === "true",
+    toleranceMode: values.toleranceMode ?? "standard",
   };
 }
 
@@ -198,6 +227,7 @@ function parseSpacingPrefill(raw?: string): SpacingPrefill {
       edgeOffset: parsed.edgeOffset !== undefined ? String(parsed.edgeOffset) : undefined,
       centerToCenter:
         parsed.centerToCenter !== undefined ? (String(parsed.centerToCenter) as "false" | "true") : undefined,
+      toleranceMode: parsed.toleranceMode,
     };
   } catch {
     return {};
@@ -213,7 +243,10 @@ function SpacingResultView({ result }: { result: SpacingResult }) {
     `3. You should end with **${result.remainingSpace.toFixed(4)} ${result.input.unit}** remaining on the right side.`,
   ].join("\n");
 
-  const markdown = [result.summary, "", instructions, "", result.diagram].join("\n");
+  const assumptions = result.assumptions?.length
+    ? ["**Assumptions**", ...result.assumptions.map((item) => `- ${item}`)].join("\n")
+    : "";
+  const markdown = [result.summary, "", instructions, "", assumptions, "", result.diagram].join("\n");
 
   return (
     <Detail
@@ -230,6 +263,7 @@ function SpacingResultView({ result }: { result: SpacingResult }) {
             title="Right-Side Remaining"
             text={`${result.remainingSpace.toFixed(4)} ${result.input.unit}`}
           />
+          <Detail.Metadata.Label title="Tolerance Mode" text={result.input.toleranceMode ?? "standard"} />
         </Detail.Metadata>
       }
       actions={
@@ -240,6 +274,51 @@ function SpacingResultView({ result }: { result: SpacingResult }) {
             content={result.positions
               .map((position, index) => `Piece ${index + 1} start: ${position.toFixed(4)} ${result.input.unit}`)
               .join("\n")}
+          />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Spacing ${result.input.count}pcs ${result.input.totalLength}${result.input.unit}`;
+              await saveJobRevision({
+                jobName,
+                type: "spacing",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Cut List"
+            onAction={() =>
+              launchCommand({
+                name: "cutlist",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    pieces: [
+                      {
+                        length: result.input.elementWidth,
+                        width: result.input.elementWidth,
+                        quantity: result.input.count,
+                        label: "Even Parts",
+                      },
+                    ],
+                    stock: {
+                      type: "board",
+                      length: result.input.totalLength,
+                      width: result.input.elementWidth * 2,
+                      unit: result.input.unit,
+                    },
+                    kerf: result.input.unit === "inches" ? 0.125 : result.input.unit === "mm" ? 3.2 : 0.32,
+                    unit: result.input.unit,
+                    allowRotation: true,
+                    toleranceMode: result.input.toleranceMode ?? "standard",
+                  }),
+                },
+              })
+            }
           />
         </ActionPanel>
       }

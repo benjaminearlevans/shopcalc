@@ -13,53 +13,69 @@ ShopCalc is a Raycast extension for woodworking and fabrication calculations wit
 1. `Guided Start`
 
 - Plain-language launcher for all calculators.
+- Includes quick entry to Template Library, Project Profiles, and Saved Jobs.
 
-2. `Spacing Calculator`
+2. `Template Library`
+
+- Prefilled starter workflows (spacing, drawer, hinge, slide, scribe, drill, conversion).
+- One action opens the target command with assumptions and defaults already set.
+
+3. `Project Profiles`
+
+- Save default units, fraction precision, kerf width, tolerance mode, and safety tool context.
+- Set an active profile; calculators use it as command defaults.
+
+4. `Saved Jobs`
+
+- Save output revisions from result views.
+- Compare latest revisions to highlight numeric deltas.
+
+5. `Spacing Calculator`
 
 - Inputs: total span, piece count, piece width, margin, gap style.
 - Output: gap size, position marks, and step-by-step marking instructions.
 
-3. `Unit Converter`
+6. `Unit Converter`
 
 - Inputs: value, source unit, target unit, fraction detail.
 - Output: decimal + fractional inches, millimeters, and centimeters.
 
-4. `Cut List Calculator`
+7. `Cut List Calculator`
 
 - Inputs: up to 4 piece types (length/width/qty), stock dimensions, kerf, material type.
 - Output: stock count, waste %, and layout guidance.
 
-5. `Joint Angle Calculator`
+8. `Joint Angle Calculator`
 
 - Starts with task intent (corner, stairs, polygon, advanced).
 - Output: saw settings + next-step instructions.
 
-6. `Drawer Box Engine`
+9. `Drawer Box Engine`
 
 - Inputs: opening width, drawer depth, slide mode/clearance, material thickness, joinery, bottom inset/thickness.
 - Output: side and front/back panel dimensions, bottom panel size, joinery rabbet values, clearance warnings.
 
-7. `Hinge Layout Generator`
+10. `Hinge Layout Generator`
 
 - Inputs: door height, top/bottom offsets, cup diameter, edge setback, overlay/inset.
 - Output: mirror-safe drilling coordinates, template reference, optional STL parameter JSON.
 
-8. `Slide Spacer Generator`
+11. `Slide Spacer Generator`
 
 - Inputs: cabinet interior height, drawer count, top margin, gap spacing, slide thickness.
 - Output: exact vertical slide coordinates, spacer block size, baseline offset system.
 
-9. `Scribe & Oversize Planner`
+12. `Scribe & Oversize Planner`
 
 - Inputs: nominal width, high/low/plumb deviations, desired visible width.
 - Output: recommended rough-cut dimension, oversize margin, max scribe allowance, shim-risk flag.
 
-10. `Drill Depth & Stop Control`
+13. `Drill Depth & Stop Control`
 
 - Inputs: desired hole depth, material thickness, fastener length, optional screw diameter/type.
 - Output: stop collar setting, minimum safe drilling depth, through-hole warning, pilot recommendation.
 
-11. `Calculation History`
+14. `Calculation History`
 
 - Keeps the last 10 calculations.
 - Actions: view, rerun, edit inputs, copy summary, copy inputs JSON, clear history.
@@ -100,6 +116,11 @@ Examples:
 - Force-vector safety prompts are integrated by tool context (`router`, `table-saw`, `drill`, `pocket-screw`).
 - Most numeric fields now accept mixed input styles (`12-7/8`, `35mm`, `2.54cm`) and convert automatically to selected units.
 - New fabrication commands include `Basic` and `Advanced` modes to reduce form complexity for first-time users.
+- Result views now include:
+  - assumptions panel
+  - tolerance mode traceability
+  - cross-tool handoff actions
+  - save-to-job revision actions
 
 ## Production Checklist (Raycast Store)
 

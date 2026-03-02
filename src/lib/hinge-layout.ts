@@ -3,12 +3,14 @@ import { formatNumber, unitLabel } from "../utils/format";
 
 export function calculateHingeLayout(input: HingeLayoutInput): HingeLayoutResult {
   validateInput(input);
+  const toleranceMode = input.toleranceMode ?? "standard";
 
   const topHoleY = input.topHingeOffset;
   const bottomHoleY = input.doorHeight - input.bottomHingeOffset;
   const cupCenterX = input.edgeSetback + input.cupDiameter / 2;
 
-  const mirrorSafe = Math.abs(input.topHingeOffset - input.bottomHingeOffset) < toleranceForUnit(input.unit);
+  const mirrorSafe =
+    Math.abs(input.topHingeOffset - input.bottomHingeOffset) < toleranceForUnit(input.unit, toleranceMode);
   const printableTemplateRef = `Template origin at top-left; drill cup centers at X=${formatNumber(cupCenterX, 3)} ${unitLabel(
     input.unit,
   )}, Y=${formatNumber(topHoleY, 3)} and ${formatNumber(bottomHoleY, 3)} ${unitLabel(input.unit)}`;
@@ -23,6 +25,16 @@ export function calculateHingeLayout(input: HingeLayoutInput): HingeLayoutResult
   if (!mirrorSafe) {
     warnings.push("Top and bottom offsets are not symmetric.");
   }
+  if (toleranceMode === "tight" && !mirrorSafe) {
+    warnings.push("Tight tolerance mode requires mirrored offsets within a smaller window.");
+  }
+
+  const assumptions = [
+    `Tolerance mode: ${toleranceMode}`,
+    "Top hinge coordinate is measured from the top edge to cup center.",
+    "Bottom hinge coordinate is mirrored from the bottom edge.",
+    "Cup center X uses edge setback + half cup diameter.",
+  ];
 
   const stlParams = input.includeStlParams
     ? JSON.stringify(
@@ -40,6 +52,7 @@ export function calculateHingeLayout(input: HingeLayoutInput): HingeLayoutResult
 
   const summary = [
     `**Hinge Layout (${input.mode})**`,
+    `Tolerance mode: **${toleranceMode}**`,
     `Top cup center: **X ${formatNumber(cupCenterX, 3)}, Y ${formatNumber(topHoleY, 3)} ${unitLabel(input.unit)}**`,
     `Bottom cup center: **X ${formatNumber(cupCenterX, 3)}, Y ${formatNumber(bottomHoleY, 3)} ${unitLabel(input.unit)}**`,
     `Mirror-safe layout: **${mirrorSafe ? "Yes" : "No"}**`,
@@ -56,6 +69,7 @@ export function calculateHingeLayout(input: HingeLayoutInput): HingeLayoutResult
     printableTemplateRef,
     stlParams,
     warnings,
+    assumptions,
     summary,
   };
 }
@@ -80,14 +94,18 @@ function validateInput(input: HingeLayoutInput): void {
   }
 }
 
-function toleranceForUnit(unit: HingeLayoutInput["unit"]): number {
-  if (unit === "mm") {
-    return 1;
+function toleranceForUnit(
+  unit: HingeLayoutInput["unit"],
+  mode: NonNullable<HingeLayoutInput["toleranceMode"]>,
+): number {
+  const base = unit === "mm" ? 1 : unit === "cm" ? 0.1 : 1 / 32;
+  if (mode === "tight") {
+    return base * 0.6;
   }
-  if (unit === "cm") {
-    return 0.1;
+  if (mode === "loose") {
+    return base * 1.6;
   }
-  return 1 / 32;
+  return base;
 }
 
 function round3(value: number): number {

@@ -11,11 +11,14 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useMemo, useState } from "react";
+import { useCachedPromise } from "@raycast/utils";
+import { useEffect, useMemo, useState } from "react";
 import { convertUnits } from "../lib/conversion";
 import { parseMeasurementInput } from "../lib/measurements";
 import { ConversionInput, ConversionResult, ExtensionPreferences, FractionPrecision, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
+import { getActiveProfile } from "../utils/profiles";
 
 interface ConvertFormValues {
   value: string;
@@ -32,16 +35,29 @@ export default function ConvertCommand(props: LaunchProps<{ arguments: ConvertAr
   const { push } = useNavigation();
   const prefs = getPreferenceValues<ExtensionPreferences>();
   const prefill = parseConvertPrefill(props.arguments.prefill);
+  const hasPrefill = Boolean(props.arguments.prefill);
+  const { data: activeProfile } = useCachedPromise(getActiveProfile, [prefs]);
 
-  const defaultFrom = (prefill.from ?? (prefs.defaultUnit as Unit) ?? "mm") as Unit;
+  const defaultFrom = (prefill.from ?? activeProfile?.unit ?? (prefs.defaultUnit as Unit) ?? "mm") as Unit;
   const defaultTo = defaultFrom === "inches" ? "mm" : "inches";
 
   const [valueInput, setValueInput] = useState(prefill.value !== undefined ? String(prefill.value) : "");
   const [fromUnit, setFromUnit] = useState<Unit>(defaultFrom);
   const [toUnit, setToUnit] = useState<Unit>(prefill.to ?? defaultTo);
   const [precision, setPrecision] = useState<string>(
-    prefill.precision !== undefined ? String(prefill.precision) : (prefs.fractionPrecision ?? "16"),
+    prefill.precision !== undefined
+      ? String(prefill.precision)
+      : String(activeProfile?.fractionPrecision ?? prefs.fractionPrecision ?? "16"),
   );
+
+  useEffect(() => {
+    if (!activeProfile || hasPrefill) {
+      return;
+    }
+    setFromUnit(activeProfile.unit);
+    setToUnit(activeProfile.unit === "inches" ? "mm" : "inches");
+    setPrecision(String(activeProfile.fractionPrecision));
+  }, [activeProfile, hasPrefill]);
 
   const isMetricOnly = fromUnit !== "inches" && toUnit !== "inches";
 
@@ -229,6 +245,39 @@ function ConvertResultView({ result, to }: { result: ConversionResult; to: Unit 
           <Action.CopyToClipboard
             title="Copy Short Result"
             content={`${result.inches.toFixed(6)} in (${result.fractional.display}) / ${result.mm.toFixed(2)} mm / ${result.cm.toFixed(3)} cm`}
+          />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Convert ${result.input.value} ${result.input.from}`;
+              await saveJobRevision({
+                jobName,
+                type: "conversion",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Spacing with Converted Span"
+            onAction={() =>
+              launchCommand({
+                name: "spacing",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    totalLength: to === "inches" ? result.inches : to === "mm" ? result.mm : result.cm,
+                    count: 5,
+                    elementWidth: to === "inches" ? 1 : to === "mm" ? 25.4 : 2.54,
+                    unit: to,
+                    edgeOffset: 0,
+                    centerToCenter: false,
+                  }),
+                },
+              })
+            }
           />
         </ActionPanel>
       }

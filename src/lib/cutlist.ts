@@ -25,15 +25,21 @@ interface PlacementCandidate {
 
 export function calculateCutList(input: CutListInput): CutListResult {
   validateCutListInput(input);
+  const toleranceMode = input.toleranceMode ?? "standard";
+  const toleranceKerfOffset = kerfOffset(input.unit, toleranceMode);
+  const normalizedInput: CutListInput = {
+    ...input,
+    kerf: Math.max(0, input.kerf + toleranceKerfOffset),
+  };
 
-  const pieces = expandPieces(input.pieces);
+  const pieces = expandPieces(normalizedInput.pieces);
   const sortedPieces = [...pieces].sort((a, b) => b.length * b.width - a.length * a.width);
 
-  if (input.stock.type === "board") {
-    return calculateBoardCutList(input, sortedPieces);
+  if (normalizedInput.stock.type === "board") {
+    return calculateBoardCutList(normalizedInput, sortedPieces);
   }
 
-  return calculateSheetCutList(input, sortedPieces);
+  return calculateSheetCutList(normalizedInput, sortedPieces);
 }
 
 function calculateBoardCutList(input: CutListInput, pieces: ExpandedPiece[]): CutListResult {
@@ -80,10 +86,17 @@ function calculateBoardCutList(input: CutListInput, pieces: ExpandedPiece[]): Cu
 
   const layout = buildBoardLayoutDiagram(boardLayouts, stock.length, unitLabel(input.unit));
   const summary = [
+    `Tolerance mode: **${input.toleranceMode ?? "standard"}**`,
     `**Stock needed**: ${boards.length} board(s)`,
     `**Total cut length**: ${formatNumber(totalCutLength, 3)} ${unitLabel(input.unit)}`,
     `**Waste**: ${formatNumber(waste, 3)} ${unitLabel(input.unit)} (${formatNumber(wastePercent, 2)}%)`,
   ].join("\n\n");
+  const assumptions = [
+    `Tolerance mode: ${input.toleranceMode ?? "standard"}`,
+    "Board optimizer uses first-fit decreasing by length.",
+    "Kerf is added only between adjacent cuts on the same board.",
+    "Result is a heuristic estimate and not globally optimal.",
+  ];
 
   return {
     input,
@@ -93,6 +106,7 @@ function calculateBoardCutList(input: CutListInput, pieces: ExpandedPiece[]): Cu
     wastePercent: round(wastePercent, 4),
     layout,
     boardLayouts,
+    assumptions,
     summary,
   };
 }
@@ -136,10 +150,17 @@ function calculateSheetCutList(input: CutListInput, pieces: ExpandedPiece[]): Cu
 
   const layout = buildSheetLayoutDiagram(placements, stock.length, stock.width, unitLabel(input.unit));
   const summary = [
+    `Tolerance mode: **${input.toleranceMode ?? "standard"}**`,
     `**Stock needed**: ${sheets.length} sheet(s)`,
     `**Total cut length**: ${formatNumber(totalCutLength, 3)} ${unitLabel(input.unit)}`,
     `**Waste**: ${formatNumber(waste, 3)} ${unitLabel(input.unit)}² (${formatNumber(wastePercent, 2)}%)`,
   ].join("\n\n");
+  const assumptions = [
+    `Tolerance mode: ${input.toleranceMode ?? "standard"}`,
+    `Rotation allowed: ${allowRotation ? "yes" : "no"}`,
+    "Sheet optimizer uses deterministic guillotine free-rectangle placement.",
+    "Result is a heuristic estimate and not globally optimal.",
+  ];
 
   return {
     input,
@@ -149,6 +170,7 @@ function calculateSheetCutList(input: CutListInput, pieces: ExpandedPiece[]): Cu
     wastePercent: round(wastePercent, 4),
     layout,
     sheetPlacements: placements,
+    assumptions,
     summary,
   };
 }
@@ -318,5 +340,16 @@ export function parsePieceLines(raw: string): CutPiece[] {
 }
 
 export function formatCutListResult(result: CutListResult, unit: Unit): string {
-  return [result.summary, "", result.layout, "", `_Unit: ${unitLabel(unit)}_`].join("\n");
+  const assumptions = result.assumptions?.length
+    ? ["", "**Assumptions**", ...result.assumptions.map((item) => `- ${item}`)].join("\n")
+    : "";
+  return [result.summary, assumptions, "", result.layout, "", `_Unit: ${unitLabel(unit)}_`].join("\n");
+}
+
+function kerfOffset(unit: Unit, toleranceMode: NonNullable<CutListInput["toleranceMode"]>): number {
+  if (toleranceMode === "standard") {
+    return 0;
+  }
+  const base = unit === "mm" ? 0.1 : unit === "cm" ? 0.01 : 0.004;
+  return toleranceMode === "tight" ? base : -base;
 }

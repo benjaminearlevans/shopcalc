@@ -3,13 +3,14 @@ import { formatNumber, unitLabel } from "../utils/format";
 
 export function calculateScribePlan(input: ScribePlannerInput): ScribePlannerResult {
   validateInput(input);
+  const toleranceMode = input.toleranceMode ?? "standard";
 
   const maxDeviation = Math.max(
     Math.abs(input.highDeviation),
     Math.abs(input.lowDeviation),
     Math.abs(input.plumbDeviation),
   );
-  const oversizeBuffer = oversizeBufferForUnit(input.unit);
+  const oversizeBuffer = oversizeBufferForUnit(input.unit, toleranceMode);
   const oversizeMargin = maxDeviation + oversizeBuffer;
   const roughCutDimension = input.desiredVisibleWidth + oversizeMargin;
   const maximumScribeAllowance = maxDeviation + oversizeBuffer * 0.5;
@@ -27,8 +28,16 @@ export function calculateScribePlan(input: ScribePlannerInput): ScribePlannerRes
     warnings.push("Recommended rough cut exceeds nominal width significantly.");
   }
 
+  const assumptions = [
+    `Tolerance mode: ${toleranceMode}`,
+    "Uses the largest absolute deviation across high/low/plumb as controlling error.",
+    "Adds oversize buffer before trimming to final visible width.",
+    "Shim tolerance flag is advisory, not a structural check.",
+  ];
+
   const summary = [
     "**Scribe & Oversize Plan**",
+    `Tolerance mode: **${toleranceMode}**`,
     `Rough-cut dimension: **${formatNumber(roughCutDimension, 3)} ${unitLabel(input.unit)}**`,
     `Oversize margin: **${formatNumber(oversizeMargin, 3)} ${unitLabel(input.unit)}**`,
     `Maximum scribe allowance: **${formatNumber(maximumScribeAllowance, 3)} ${unitLabel(input.unit)}**`,
@@ -43,6 +52,7 @@ export function calculateScribePlan(input: ScribePlannerInput): ScribePlannerRes
     maximumScribeAllowance,
     exceedsShimTolerance,
     warnings,
+    assumptions,
     summary,
   };
 }
@@ -67,14 +77,18 @@ function validateInput(input: ScribePlannerInput): void {
   }
 }
 
-function oversizeBufferForUnit(unit: ScribePlannerInput["unit"]): number {
-  if (unit === "mm") {
-    return 2;
+function oversizeBufferForUnit(
+  unit: ScribePlannerInput["unit"],
+  mode: NonNullable<ScribePlannerInput["toleranceMode"]>,
+): number {
+  const base = unit === "mm" ? 2 : unit === "cm" ? 0.2 : 1 / 16;
+  if (mode === "tight") {
+    return base * 1.3;
   }
-  if (unit === "cm") {
-    return 0.2;
+  if (mode === "loose") {
+    return base * 0.7;
   }
-  return 1 / 16;
+  return base;
 }
 
 function shimToleranceForUnit(unit: ScribePlannerInput["unit"]): number {

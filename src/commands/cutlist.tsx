@@ -11,10 +11,13 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
+import { useCachedPromise } from "@raycast/utils";
 import { calculateCutList, formatCutListResult } from "../lib/cutlist";
 import { parseMeasurementInput } from "../lib/measurements";
-import { CutListInput, CutListResult, CutPiece, ExtensionPreferences, Unit } from "../types";
+import { CutListInput, CutListResult, CutPiece, ExtensionPreferences, ToleranceMode, Unit } from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
+import { getActiveProfile } from "../utils/profiles";
 
 interface CutListFormValues {
   piece1Length: string;
@@ -39,6 +42,7 @@ interface CutListFormValues {
   unit: Unit;
   kerf: string;
   allowRotation: "true" | "false";
+  toleranceMode: ToleranceMode;
 }
 
 type CutListArgs = {
@@ -64,7 +68,12 @@ const EXAMPLE_CUTLIST_PREFILL = JSON.stringify({
 export default function CutListCommand(props: LaunchProps<{ arguments: CutListArgs }>) {
   const { push } = useNavigation();
   const prefs = getPreferenceValues<ExtensionPreferences>();
+  const { data: activeProfile } = useCachedPromise(getActiveProfile, [prefs]);
   const prefill = parseCutListPrefill(props.arguments.prefill);
+  const initialUnit = prefill.unit ?? activeProfile?.unit ?? (prefs.defaultUnit as Unit) ?? "inches";
+  const initialKerf = prefill.kerf ?? String(activeProfile?.kerfWidth ?? prefs.kerfWidth ?? "0.125");
+  const initialTolerance = prefill.toleranceMode ?? activeProfile?.toleranceMode ?? "standard";
+  const formKey = `${activeProfile?.id ?? "prefs"}:${props.arguments.prefill ?? "none"}`;
 
   async function handleSubmit(values: CutListFormValues) {
     try {
@@ -81,6 +90,7 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
         unit: values.unit,
         kerf: parseMeasurementInput(values.kerf || prefs.kerfWidth || "0.125", values.unit, "kerf"),
         allowRotation: values.allowRotation === "true",
+        toleranceMode: values.toleranceMode ?? "standard",
       };
 
       const result = calculateCutList(input);
@@ -105,6 +115,7 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
 
   return (
     <Form
+      key={formKey}
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Calculate Material Needed" onSubmit={handleSubmit} />
@@ -184,7 +195,7 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
         placeholder="3.5"
         info="For boards: board width/thickness. For sheets: short side. Accepts suffix/fraction."
       />
-      <Form.Dropdown id="unit" title="Unit" defaultValue={prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches"}>
+      <Form.Dropdown id="unit" title="Unit" defaultValue={initialUnit}>
         <Form.Dropdown.Item value="inches" title="Inches" />
         <Form.Dropdown.Item value="mm" title="Millimeters" />
         <Form.Dropdown.Item value="cm" title="Centimeters" />
@@ -192,10 +203,15 @@ export default function CutListCommand(props: LaunchProps<{ arguments: CutListAr
       <Form.TextField
         id="kerf"
         title="Saw Blade Thickness (kerf)"
-        defaultValue={prefill.kerf}
-        placeholder={prefs.kerfWidth ?? "0.125"}
+        defaultValue={initialKerf}
+        placeholder={initialKerf}
         info='Width removed per cut (accepts suffix/fraction: 0.125, 3.2mm, 1/8").'
       />
+      <Form.Dropdown id="toleranceMode" title="Tolerance Mode" defaultValue={initialTolerance}>
+        <Form.Dropdown.Item value="tight" title="Tight" />
+        <Form.Dropdown.Item value="standard" title="Standard" />
+        <Form.Dropdown.Item value="loose" title="Loose" />
+      </Form.Dropdown>
       <Form.Dropdown
         id="allowRotation"
         title="Allow Piece Rotation (sheet mode)"
@@ -227,12 +243,51 @@ function CutListResultView({ result, unit }: { result: CutListResult; unit: Unit
           <Detail.Metadata.Label title="Estimated Waste" text={`${result.waste.toFixed(3)}`} />
           <Detail.Metadata.Label title="Waste Percent" text={`${result.wastePercent.toFixed(2)}%`} />
           <Detail.Metadata.Label title="Total Cut Length" text={`${result.totalCutLength.toFixed(3)}`} />
+          <Detail.Metadata.Label title="Tolerance Mode" text={result.input.toleranceMode ?? "standard"} />
         </Detail.Metadata>
       }
       actions={
         <ActionPanel>
           <Action.CopyToClipboard title="Copy Full Result" content={markdown.replace(/\*\*/g, "")} />
           <Action.CopyToClipboard title="Copy Layout" content={result.layout} />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Cutlist ${result.stockNeeded} stock`;
+              await saveJobRevision({
+                jobName,
+                type: "cutlist",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Drawer Engine"
+            onAction={() =>
+              launchCommand({
+                name: "drawer-engine",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    openingWidth: result.input.stock.width * 6,
+                    drawerDepth: result.input.stock.length * 0.2,
+                    slideType: "side-mount",
+                    slideClearance: result.input.unit === "inches" ? 0.5 : result.input.unit === "mm" ? 12.7 : 1.27,
+                    materialThickness: result.input.stock.width * 0.214,
+                    joineryType: "dado",
+                    bottomInsetDepth: result.input.unit === "inches" ? 0.25 : result.input.unit === "mm" ? 6.35 : 0.635,
+                    bottomThickness: result.input.unit === "inches" ? 0.25 : result.input.unit === "mm" ? 6.35 : 0.635,
+                    unit: result.input.unit,
+                    toleranceMode: result.input.toleranceMode ?? "standard",
+                    toolContext: "table-saw",
+                  }),
+                },
+              })
+            }
+          />
         </ActionPanel>
       }
     />
@@ -344,6 +399,7 @@ function parseCutListPrefill(raw?: string): Partial<CutListFormValues> {
       unit: input.unit,
       kerf: input.kerf !== undefined ? String(input.kerf) : undefined,
       allowRotation: input.allowRotation !== undefined ? (String(input.allowRotation) as "true" | "false") : undefined,
+      toleranceMode: input.toleranceMode,
     };
   } catch {
     return {};

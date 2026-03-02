@@ -4,6 +4,7 @@ import { toDecimalInch, toFractionalInch } from "./fractions";
 
 export function calculateSpacing(input: SpacingInput): SpacingResult {
   validateSpacingInput(input);
+  const toleranceMode = input.toleranceMode ?? "standard";
 
   const { totalLength, count, elementWidth, edgeOffset = 0, centerToCenter = false } = input;
   const availableLength = totalLength - edgeOffset * 2;
@@ -42,10 +43,19 @@ export function calculateSpacing(input: SpacingInput): SpacingResult {
 
   const summary = [
     `**${count} elements** across **${formatMeasurement(totalLength, input.unit)}**`,
+    `Tolerance mode: **${toleranceMode}**`,
     `Gap between elements: **${formatMeasurement(gap, input.unit)}**`,
     `Repeating unit: **${formatMeasurement(repeatingUnit, input.unit)}**`,
     `Remaining space: **${formatMeasurement(remainingSpace, input.unit)}**`,
   ].join("\n\n");
+
+  const assumptions = [
+    `Tolerance mode: ${toleranceMode}`,
+    centerToCenter
+      ? "Spacing is computed from piece centerlines."
+      : "Spacing is computed from edge-to-edge gaps with count + 1 gaps.",
+    "Edge offset is applied equally to left and right ends.",
+  ];
 
   return {
     input,
@@ -55,6 +65,7 @@ export function calculateSpacing(input: SpacingInput): SpacingResult {
     remainingSpace,
     repeatingUnit,
     diagram: buildStoryStickDiagram(input, positions, gap),
+    assumptions,
     summary,
   };
 }

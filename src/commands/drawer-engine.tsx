@@ -11,7 +11,8 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useMemo, useState } from "react";
+import { useCachedPromise } from "@raycast/utils";
+import { useEffect, useMemo, useState } from "react";
 import { calculateDrawerBox } from "../lib/drawer-box";
 import { parseMeasurementInput } from "../lib/measurements";
 import { formatSafetyChecklist } from "../lib/safety";
@@ -21,10 +22,13 @@ import {
   DrawerSlideType,
   ExtensionPreferences,
   JoineryType,
+  ToleranceMode,
   ToolContext,
   Unit,
 } from "../types";
 import { saveToHistory } from "../utils/history";
+import { saveJobRevision } from "../utils/jobs";
+import { getActiveProfile } from "../utils/profiles";
 
 interface DrawerFormValues {
   openingWidth: string;
@@ -38,6 +42,7 @@ interface DrawerFormValues {
   unit: Unit;
   toolContext: ToolContext;
   detailMode: "basic" | "advanced";
+  toleranceMode: ToleranceMode;
 }
 
 type DrawerArgs = {
@@ -48,6 +53,8 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
   const { push } = useNavigation();
   const prefs = getPreferenceValues<ExtensionPreferences>();
   const prefill = parsePrefill(props.arguments.prefill);
+  const hasPrefill = Boolean(props.arguments.prefill);
+  const { data: activeProfile } = useCachedPromise(getActiveProfile, [prefs]);
 
   const [openingWidth, setOpeningWidth] = useState(prefill.openingWidth ?? "");
   const [drawerDepth, setDrawerDepth] = useState(prefill.drawerDepth ?? "");
@@ -60,6 +67,16 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
   const [unit, setUnit] = useState<Unit>(prefill.unit ?? (prefs.defaultUnit as Unit) ?? "inches");
   const [toolContext, setToolContext] = useState<ToolContext>(prefill.toolContext ?? "none");
   const [detailMode, setDetailMode] = useState<"basic" | "advanced">("basic");
+  const [toleranceMode, setToleranceMode] = useState<ToleranceMode>(prefill.toleranceMode ?? "standard");
+
+  useEffect(() => {
+    if (!activeProfile || hasPrefill) {
+      return;
+    }
+    setUnit(activeProfile.unit);
+    setToolContext(activeProfile.toolContext);
+    setToleranceMode(activeProfile.toleranceMode);
+  }, [activeProfile, hasPrefill]);
 
   const preview = useMemo(() => {
     try {
@@ -75,6 +92,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
         unit,
         toolContext,
         detailMode,
+        toleranceMode,
       });
       if (!input) {
         return "Live preview: fill opening width, drawer depth, and material values.";
@@ -96,6 +114,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
     unit,
     toolContext,
     detailMode,
+    toleranceMode,
   ]);
 
   async function handleSubmit(values: DrawerFormValues) {
@@ -128,6 +147,7 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
     setUnit("inches");
     setToolContext("table-saw");
     setDetailMode("advanced");
+    setToleranceMode("standard");
   }
 
   return (
@@ -225,6 +245,17 @@ export default function DrawerEngineCommand(props: LaunchProps<{ arguments: Draw
             placeholder="0.25"
             info="Drawer bottom panel thickness. Accepts suffix/fraction."
           />
+          <Form.Dropdown
+            id="toleranceMode"
+            title="Tolerance Mode"
+            value={toleranceMode}
+            onChange={(value) => setToleranceMode(value as ToleranceMode)}
+            info="Tight: more precision, less forgiveness. Loose: easier assembly."
+          >
+            <Form.Dropdown.Item value="tight" title="Tight" />
+            <Form.Dropdown.Item value="standard" title="Standard" />
+            <Form.Dropdown.Item value="loose" title="Loose" />
+          </Form.Dropdown>
         </>
       ) : null}
       <Form.Dropdown id="unit" title="Unit" value={unit} onChange={(value) => setUnit(value as Unit)}>
@@ -263,7 +294,19 @@ function DrawerResultView({ result }: { result: DrawerBoxResult }) {
     `| Front/Back Panels | ${result.frontBackPanelLength.toFixed(3)} ${result.input.unit} |`,
     `| Bottom Panel | ${result.bottomPanelWidth.toFixed(3)} x ${result.bottomPanelLength.toFixed(3)} ${result.input.unit} |`,
   ].join("\n");
-  const markdown = [result.summary, "", "**Cut Table**", cutTable, "", result.diagram, "", safetyMarkdown].join("\n\n");
+  const assumptions = ["**Assumptions**", ...result.assumptions.map((item) => `- ${item}`)].join("\n");
+  const markdown = [
+    result.summary,
+    "",
+    "**Cut Table**",
+    cutTable,
+    "",
+    assumptions,
+    "",
+    result.diagram,
+    "",
+    safetyMarkdown,
+  ].join("\n\n");
   const joineryText = `${result.rabbetDepth.toFixed(3)} ${result.input.unit} deep x ${result.rabbetWidth.toFixed(3)} ${result.input.unit} wide`;
   const cutListText = [
     `Side: ${result.sidePanelLength.toFixed(3)} ${result.input.unit}`,
@@ -292,6 +335,7 @@ function DrawerResultView({ result }: { result: DrawerBoxResult }) {
             title="Slide Spacing"
             text={`${result.requiredSlideSpacing.toFixed(3)} ${result.input.unit}`}
           />
+          <Detail.Metadata.Label title="Tolerance Mode" text={result.input.toleranceMode ?? "standard"} />
           <Detail.Metadata.TagList title="Warnings">
             <Detail.Metadata.TagList.Item text={warningStatus} color={result.warnings.length ? "#FF7A00" : "#0CA678"} />
           </Detail.Metadata.TagList>
@@ -307,6 +351,61 @@ function DrawerResultView({ result }: { result: DrawerBoxResult }) {
           />
           <Action.CopyToClipboard title="Copy Joinery Settings" content={joineryText} />
           <Action.CopyToClipboard title="Copy JSON Export" content={JSON.stringify(result, null, 2)} />
+          <Action
+            title="Save Revision to Jobs"
+            onAction={async () => {
+              const jobName = `Drawer ${result.input.openingWidth.toFixed(2)} ${result.input.unit}`;
+              await saveJobRevision({
+                jobName,
+                type: "drawer-box",
+                summary: result.summary,
+                input: result.input,
+                output: result,
+              });
+              await showToast({ style: Toast.Style.Success, title: `Saved to ${jobName}` });
+            }}
+          />
+          <Action
+            title="Handoff: Open Slide Layout"
+            onAction={() =>
+              launchCommand({
+                name: "slide-layout",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    cabinetInteriorHeight: result.sidePanelLength + result.input.materialThickness * 4,
+                    drawerCount: 4,
+                    topMargin: result.input.materialThickness,
+                    gapSpacing: result.requiredSlideSpacing,
+                    slideThickness: result.input.materialThickness / 2,
+                    unit: result.input.unit,
+                    toolContext: result.input.toolContext ?? "none",
+                    toleranceMode: result.input.toleranceMode ?? "standard",
+                  }),
+                },
+              })
+            }
+          />
+          <Action
+            title="Handoff: Open Drill Depth"
+            onAction={() =>
+              launchCommand({
+                name: "drill-depth",
+                type: LaunchType.UserInitiated,
+                arguments: {
+                  prefill: JSON.stringify({
+                    desiredHoleDepth: result.input.bottomInsetDepth + result.input.bottomThickness,
+                    materialThickness: result.input.materialThickness,
+                    fastenerLength: result.input.materialThickness * 1.5,
+                    screwType: "wood",
+                    unit: result.input.unit,
+                    toolContext: "drill",
+                    toleranceMode: result.input.toleranceMode ?? "standard",
+                  }),
+                },
+              })
+            }
+          />
         </ActionPanel>
       }
     />
@@ -336,6 +435,7 @@ function parseInput(values: Partial<DrawerFormValues>): DrawerBoxInput | null {
     bottomThickness: parseMeasurementInput(values.bottomThickness ?? "0.25", unit, "bottom thickness"),
     unit,
     toolContext: (values.toolContext ?? "none") as ToolContext,
+    toleranceMode: (values.toleranceMode ?? "standard") as ToleranceMode,
   };
 }
 
@@ -357,6 +457,7 @@ function parsePrefill(raw?: string): Partial<DrawerFormValues> {
       bottomThickness: parsed.bottomThickness !== undefined ? String(parsed.bottomThickness) : undefined,
       unit: parsed.unit,
       toolContext: parsed.toolContext,
+      toleranceMode: parsed.toleranceMode,
     };
   } catch {
     return {};
